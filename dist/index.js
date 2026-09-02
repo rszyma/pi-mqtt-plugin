@@ -34,6 +34,14 @@ export default function homeAssistantMqttExtension(pi, customConfig) {
         return { loadError };
     }
     pi.on("session_start", async (_event, ctx) => {
+        // One-time cleanup for upgrades from < 1.0 where instance id was
+        // persisted to ~/.pi/agent/mqtt-instance-id (now ephemeral).
+        try {
+            const legacyIdFile = path.join(getAgentDir(), "mqtt-instance-id");
+            if (fs.existsSync(legacyIdFile))
+                fs.rmSync(legacyIdFile);
+        }
+        catch { /* best-effort */ }
         const { loadError } = loadSettings(ctx);
         if (loadError && ctx.hasUI) {
             ctx.ui.notify(lastLoadError, "warning");
