@@ -7,43 +7,39 @@ import type { MqttPluginConfig } from "./types.js";
 const DEFAULT_BROKER = "mqtt://127.0.0.1:1883";
 const DEFAULT_DISCOVERY_PREFIX = "homeassistant";
 const DEFAULT_QOS = 1;
-const DEFAULT_PUBLISH_INTERVAL_SECONDS = 30;
+const DEFAULT_PUBLISH_INTERVAL_SECONDS = 5;
 
-function getHomeDir(): string {
-  return os.homedir();
+export const SETTINGS_KEY = "mqtt";
+
+export type MqttSettings = Partial<MqttPluginConfig>;
+
+/**
+ * Generate a per-process ephemeral instance ID. No disk persistence.
+ * Stable within a process, unique across concurrent processes sharing the
+ * same ~/.pi dir. Use env var PI_AGENT_MQTT_INSTANCE_ID for a stable
+ * persistent identity (e.g. in systemd units or docker env).
+ */
+let cachedEphemeralId: string | null = null;
+
+function ephemeralId(): string {
+  if (cachedEphemeralId) return cachedEphemeralId;
+  const hostname = os.hostname().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "pi";
+  // pid makes concurrent processes unique even in same millisecond;
+  // random suffix guards fork/reuse edge cases.
+  cachedEphemeralId = `${hostname}-${process.pid}-${randomUUID().slice(0, 6)}`;
+  return cachedEphemeralId;
+}
+
+/** For tests: reset the process-scoped cached id. */
+export function _resetEphemeralIdCache(): void {
+  cachedEphemeralId = null;
 }
 
 export function getStableInstanceId(explicitId?: string): string {
   if (explicitId && explicitId.trim().length > 0) {
     return explicitId.trim();
   }
-
-  const idFile = path.join(getHomeDir(), ".pi", "agent", "mqtt-instance-id");
-  try {
-    if (fs.existsSync(idFile)) {
-      const content = fs.readFileSync(idFile, "utf8").trim();
-      if (content.length > 0) {
-        return content;
-      }
-    }
-  } catch {
-    // Ignore read errors
-  }
-
-  const hostname = os.hostname().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "pi";
-  const generatedId = `${hostname}-${randomUUID().slice(0, 6)}`;
-
-  try {
-    const dir = path.dirname(idFile);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(idFile, generatedId, "utf8");
-  } catch {
-    // If saving fails, still return the generated ID
-  }
-
-  return generatedId;
+  return ephemeralId();
 }
 
 function tryReadJsonFile<T>(filePath: string): T | null {
@@ -53,20 +49,127 @@ function tryReadJsonFile<T>(filePath: string): T | null {
       return JSON.parse(content) as T;
     }
   } catch {
-    // Ignore invalid JSON files
+    // Intentionally silent: file reads happen before ctx.ui exists.
+    // Warnings for invalid JSON are surfaced in session_start via
+    // loadMqttSettings (same pattern as pi-ding).
   }
   return null;
+}
+
+export type LoadMqttSettingsResult = {
+  config: Partial<MqttPluginConfig>;
+  loadError: string | undefined;
+};
+
+/**
+ * Read mqtt config from pi settings.json files.
+ * - Global:  ~/.pi/agent/settings.json  -> settings["mqtt"]
+ * - Project: <cwd>/.pi/settings.json     -> settings["mqtt"]
+ * Project overrides global (shallow merge, same as pi-ding).
+ * Falls back to legacy dedicated files (~/.pi/agent/mqtt.json, .pi/mqtt.json)
+ * for backwards compatibility.
+ */
+export function loadMqttSettings(
+  cwd: string,
+  agentDir: string,
+): LoadMqttSettingsResult {
+  let loadError: string | undefined;
+
+  function readSettingsFile(filePath: string): Record<string, unknown> | null {
+    try {
+      if (!fs.existsSync(filePath)) return {};
+      const raw = fs.readFileSync(filePath, "utf8");
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      loadError = loadError ?? `Invalid JSON in ${filePath}: ${msg}`;
+      return null;
+    }
+  }
+
+  const globalSettingsPath = path.join(agentDir, "settings.json");
+  const projectSettingsPath = path.join(cwd, ".pi", "settings.json");
+
+  const globalSettings = readSettingsFile(globalSettingsPath);
+  const projectSettings = readSettingsFile(projectSettingsPath);
+
+  const globalMqtt =
+    globalSettings && SETTINGS_KEY in globalSettings
+      ? (globalSettings[SETTINGS_KEY] as Partial<MqttPluginConfig>)
+      : {};
+  const projectMqtt =
+    projectSettings && SETTINGS_KEY in projectSettings
+      ? (projectSettings[SETTINGS_KEY] as Partial<MqttPluginConfig>)
+      : {};
+
+  // Back-compat: legacy dedicated mqtt.json files (deprecated, lowest priority
+  // inside their scope so settings.json wins if both exist).
+  const legacyGlobal = tryReadJsonFile<Partial<MqttPluginConfig>>(
+    path.join(agentDir, "mqtt.json"),
+  );
+  const legacyProject = tryReadJsonFile<Partial<MqttPluginConfig>>(
+    path.join(cwd, ".pi", "mqtt.json"),
+  );
+
+  // Merge order (lowest -> highest priority):
+  // legacyGlobal < settings global < legacyProject < settings project
+  const merged: Partial<MqttPluginConfig> = {
+    ...(legacyGlobal ?? {}),
+    ...(globalMqtt ?? {}),
+    ...(legacyProject ?? {}),
+    ...(projectMqtt ?? {}),
+  };
+
+  // Remove undefined keys so they don't shadow later merges
+  for (const k of Object.keys(merged) as Array<keyof MqttPluginConfig>) {
+    if (merged[k] === undefined) delete merged[k];
+  }
+
+  return { config: merged, loadError };
+}
+
+export function sanitizeMqttConfig(input: unknown): Partial<MqttPluginConfig> {
+  if (!input || typeof input !== "object") return {};
+  const o = input as Record<string, unknown>;
+  const out: Partial<MqttPluginConfig> = {};
+  if (typeof o.broker === "string") out.broker = o.broker;
+  if (typeof o.username === "string") out.username = o.username;
+  if (typeof o.password === "string") out.password = o.password;
+  if (typeof o.password_env === "string") out.password_env = o.password_env;
+  if (typeof o.instance_id === "string") out.instance_id = o.instance_id;
+  if (typeof o.device_name === "string") out.device_name = o.device_name;
+  if (typeof o.base_topic === "string") out.base_topic = o.base_topic;
+  if (typeof o.discovery_prefix === "string") out.discovery_prefix = o.discovery_prefix;
+  if (typeof o.qos === "number" && [0, 1, 2].includes(o.qos)) out.qos = o.qos as 0 | 1 | 2;
+  if (typeof o.retain_state === "boolean") out.retain_state = o.retain_state;
+  if (typeof o.publish_interval_seconds === "number") out.publish_interval_seconds = o.publish_interval_seconds;
+  if (o.controls && typeof o.controls === "object") {
+    const c = o.controls as Record<string, unknown>;
+    out.controls = {};
+    if (typeof c.stop === "boolean") out.controls.stop = c.stop;
+  }
+  if (o.expose && typeof o.expose === "object") {
+    const e = o.expose as Record<string, unknown>;
+    out.expose = {};
+    if (typeof e.session === "boolean") out.expose.session = e.session;
+    if (typeof e.model === "boolean") out.expose.model = e.model;
+    if (typeof e.tool === "boolean") out.expose.tool = e.tool;
+    if (typeof e.token_usage === "boolean") out.expose.token_usage = e.token_usage;
+    if (typeof e.errors === "boolean") out.expose.errors = e.errors;
+    if (typeof e.context_percent === "boolean") out.expose.context_percent = e.context_percent;
+  }
+  return out;
 }
 
 export function resolveConfig(
   cwd: string = process.cwd(),
   customConfig?: Partial<MqttPluginConfig>,
+  agentDir?: string,
 ): MqttPluginConfig {
-  const globalConfigPath = path.join(getHomeDir(), ".pi", "agent", "mqtt.json");
-  const projectConfigPath = path.join(cwd, ".pi", "mqtt.json");
+  // Resolve agentDir lazily so tests don't need to mock getAgentDir.
+  const resolvedAgentDir = agentDir ?? path.join(os.homedir(), ".pi", "agent");
 
-  const globalFileConfig = tryReadJsonFile<Partial<MqttPluginConfig>>(globalConfigPath) ?? {};
-  const projectFileConfig = tryReadJsonFile<Partial<MqttPluginConfig>>(projectConfigPath) ?? {};
+  const { config: fileConfig } = loadMqttSettings(cwd, resolvedAgentDir);
 
   const envBroker = process.env.PI_AGENT_MQTT_BROKER || process.env.MQTT_BROKER;
   const envUsername = process.env.PI_AGENT_MQTT_USERNAME || process.env.MQTT_USERNAME;
@@ -79,37 +182,24 @@ export function resolveConfig(
   const envDeviceName = process.env.PI_AGENT_MQTT_DEVICE_NAME;
   const envBaseTopic = process.env.PI_AGENT_MQTT_BASE_TOPIC;
   const envDiscoveryPrefix = process.env.PI_AGENT_MQTT_DISCOVERY_PREFIX;
-  const envEnableStop = process.env.PI_AGENT_MQTT_ENABLE_STOP === "true" || process.env.PI_AGENT_MQTT_ENABLE_STOP === "1";
+  const envEnableStop =
+    process.env.PI_AGENT_MQTT_ENABLE_STOP === "true" || process.env.PI_AGENT_MQTT_ENABLE_STOP === "1";
 
   const mergedPartial: Partial<MqttPluginConfig> = {
-    ...globalFileConfig,
-    ...projectFileConfig,
-    ...customConfig,
+    ...fileConfig,
+    ...sanitizeMqttConfig(customConfig ?? {}),
   };
 
-  const instanceId = getStableInstanceId(
-    envInstanceId || mergedPartial.instance_id,
-  );
+  const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id);
 
   const hostname = os.hostname() || "host";
-  const deviceName =
-    envDeviceName ||
-    mergedPartial.device_name ||
-    `Pi Agent on ${hostname}`;
+  const deviceName = envDeviceName || mergedPartial.device_name || `Pi Agent on ${hostname}`;
 
-  const baseTopic =
-    envBaseTopic ||
-    mergedPartial.base_topic ||
-    `pi-agent/${instanceId}`;
+  const baseTopic = envBaseTopic || mergedPartial.base_topic || `pi-agent/${instanceId}`;
 
-  const discoveryPrefix =
-    envDiscoveryPrefix ||
-    mergedPartial.discovery_prefix ||
-    DEFAULT_DISCOVERY_PREFIX;
+  const discoveryPrefix = envDiscoveryPrefix || mergedPartial.discovery_prefix || DEFAULT_DISCOVERY_PREFIX;
 
-  let resolvedPassword =
-    envPassword ||
-    mergedPartial.password;
+  let resolvedPassword = envPassword || mergedPartial.password;
 
   if (!resolvedPassword && mergedPartial.password_env) {
     resolvedPassword = process.env[mergedPartial.password_env];

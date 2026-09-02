@@ -30,7 +30,7 @@ describe("Config resolution", () => {
     expect(config.discovery_prefix).toBe("homeassistant");
     expect(config.qos).toBe(1);
     expect(config.retain_state).toBe(true);
-    expect(config.publish_interval_seconds).toBe(30);
+    expect(config.publish_interval_seconds).toBe(5);
     expect(config.controls.stop).toBe(false);
     expect(config.expose.session).toBe(true);
     expect(config.expose.model).toBe(true);

@@ -1,8 +1,25 @@
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { resolveConfig } from "./config.js";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { loadMqttSettings, resolveConfig, sanitizeMqttConfig } from "./config.js";
 import { MqttService } from "./mqtt-service.js";
 import { StateManager } from "./state.js";
 import type { MqttPluginConfig } from "./types.js";
+
+function readJsonFile(filePath: string): Record<string, unknown> | null {
+  try {
+    if (!fs.existsSync(filePath)) return {};
+    return JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function writeJsonFile(filePath: string, data: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf8");
+}
 
 export default function homeAssistantMqttExtension(
   pi: ExtensionAPI,
@@ -12,13 +29,32 @@ export default function homeAssistantMqttExtension(
   let stateManager: StateManager | null = null;
   let mqttService: MqttService | null = null;
 
+  let globalSettingsPath: string | undefined;
+  let projectSettingsPath: string | undefined;
+  let lastLoadError: string | undefined;
+
+  function loadSettings(ctx: { cwd: string }): { loadError: string | undefined } {
+    const agentDir = getAgentDir();
+    globalSettingsPath = path.join(agentDir, "settings.json");
+    projectSettingsPath = path.join(ctx.cwd, ".pi", "settings.json");
+    const { loadError } = loadMqttSettings(ctx.cwd, agentDir);
+    lastLoadError = loadError;
+    return { loadError };
+  }
+
   pi.on("session_start", async (_event, ctx) => {
+    const { loadError } = loadSettings(ctx);
+    if (loadError && ctx.hasUI) {
+      ctx.ui.notify(lastLoadError!, "warning");
+    }
     config = resolveConfig(ctx.cwd, customConfig);
     stateManager = new StateManager(config);
 
     const sessionFile = ctx.sessionManager.getSessionFile();
     const sessionId = ctx.sessionManager.getSessionId();
-    stateManager.setSession(sessionFile ? sessionFile.split("/").pop() ?? sessionId : sessionId);
+    stateManager.setSession(
+      sessionFile ? (sessionFile.split("/").pop() ?? sessionId) : sessionId,
+    );
 
     if (ctx.model) {
       stateManager.setModel(`${ctx.model.provider}/${ctx.model.id}`);
@@ -136,9 +172,11 @@ export default function homeAssistantMqttExtension(
       const statusText = [
         `Broker: ${config.broker}`,
         `Connected: ${connected ? "Yes" : "No"}`,
-        `Instance ID: ${config.instance_id}`,
+        `Instance ID: ${config.instance_id} (ephemeral; set PI_AGENT_MQTT_INSTANCE_ID for stable)`,
         `Base Topic: ${config.base_topic}`,
         `Discovery Prefix: ${config.discovery_prefix}`,
+        `Settings: global ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,
+        ...(lastLoadError ? [`Settings error: ${lastLoadError}`] : []),
         `Current Status: ${rawState.status}`,
         `Active Session: ${rawState.session ?? "none"}`,
         `Active Model: ${rawState.model ?? "none"}`,
@@ -159,6 +197,75 @@ export default function homeAssistantMqttExtension(
 
       await mqttService.cleanDiscovery();
       ctx.ui.notify("Cleaned MQTT discovery topics in Home Assistant", "info");
+    },
+  });
+
+  pi.registerCommand("mqtt", {
+    description: "Configure Home Assistant MQTT (usage: /mqtt [info|reload|edit [project|global]])",
+    handler: async (args, ctx) => {
+      const tokens = (args || "").trim().split(/\s+/).filter(Boolean);
+      const sub = (tokens[0] || "info").toLowerCase();
+
+      if (sub === "info") {
+        const status = mqttService?.getConnected() ? "connected" : "disconnected";
+        const lines = [
+          `MQTT: ${status}`,
+          `Broker: ${config?.broker ?? "(not loaded yet)"}`,
+          `Instance: ${config?.instance_id ?? "?"}`,
+          `Base topic: ${config?.base_topic ?? "?"}`,
+          `Global settings: ${globalSettingsPath ?? "?"}`,
+          `Project settings: ${projectSettingsPath ?? "?"}`,
+          ...(lastLoadError ? [`Error: ${lastLoadError}`] : []),
+          ``,
+          `Config lives under the "mqtt" key in settings.json:`,
+          `  { "mqtt": { "broker": "mqtt://...", "instance_id": "..." } }`,
+          `Project settings override global. Env vars override both.`,
+        ];
+        ctx.ui.notify(lines.join("\n"), "info");
+        return;
+      }
+
+      if (sub === "reload") {
+        const { loadError } = loadSettings(ctx);
+        // Re-resolve without restart? Inform user they should /reload for full reconnect.
+        ctx.ui.notify(
+          loadError
+            ? `Reloaded settings (with error: ${loadError}) — run /reload to reconnect MQTT`
+            : "Reloaded MQTT settings — run /reload to reconnect with new config",
+          loadError ? "warning" : "info",
+        );
+        return;
+      }
+
+      if (sub === "edit") {
+        const scope = (tokens[1] || "").toLowerCase();
+        const target: "project" | "global" = scope === "global" ? "global" : "project";
+        const settingsPath =
+          target === "project" ? projectSettingsPath! : globalSettingsPath!;
+
+        const parsed = readJsonFile(settingsPath);
+        if (parsed === null) {
+          ctx.ui.notify(`Invalid JSON in ${settingsPath}`, "error");
+          return;
+        }
+        const root = parsed as Record<string, unknown>;
+        const existing = sanitizeMqttConfig(root["mqtt"]);
+        const prefill = JSON.stringify(existing, null, 2) + "\n";
+        const edited = await ctx.ui.editor(`Edit mqtt config (${target})`, prefill);
+        if (edited === undefined) return;
+        try {
+          const next = sanitizeMqttConfig(JSON.parse(edited));
+          const nextRoot = { ...root, mqtt: next };
+          writeJsonFile(settingsPath, nextRoot);
+          ctx.ui.notify(`Saved mqtt config to ${settingsPath} — run /reload to apply`, "info");
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          ctx.ui.notify(`Invalid JSON: ${msg}`, "error");
+        }
+        return;
+      }
+
+      ctx.ui.notify(`Unknown subcommand "${sub}". Usage: /mqtt [info|reload|edit [project|global]]`, "warning");
     },
   });
 }

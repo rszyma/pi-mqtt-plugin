@@ -36,36 +36,57 @@ pi install npm:pi-home-assistant-mqtt
 
 ## Configuration
 
-The plugin reads configuration from environment variables or a configuration file.
+The plugin reads configuration from Pi settings files and environment variables.
+Environment variables override file settings.
 
-### Configuration File
+### Settings File (Recommended)
 
-Create `.pi/mqtt.json` in your project or `~/.pi/agent/mqtt.json` for global settings:
+Add an `mqtt` key to `~/.pi/agent/settings.json` (global) or `.pi/settings.json` (project).
+Project settings override global settings — same pattern as `pi-ding`.
+
+Global example (`~/.pi/agent/settings.json`):
 
 ```json
 {
-  "broker": "mqtt://192.168.1.50:1883",
-  "username": "pi-agent",
-  "password_env": "PI_AGENT_MQTT_PASSWORD",
-  "instance_id": "workstation-pi",
-  "device_name": "Pi Agent on Workstation",
-  "base_topic": "pi-agent/workstation-pi",
-  "discovery_prefix": "homeassistant",
-  "qos": 1,
-  "retain_state": true,
-  "publish_interval_seconds": 30,
-  "controls": {
-    "stop": false
-  },
-  "expose": {
-    "session": true,
-    "model": true,
-    "tool": true,
-    "token_usage": true,
-    "errors": true
+  "mqtt": {
+    "broker": "mqtt://192.168.1.50:1883",
+    "username": "pi-agent",
+    "password_env": "PI_AGENT_MQTT_PASSWORD",
+    "device_name": "Pi Agent on Workstation",
+    "discovery_prefix": "homeassistant",
+    "qos": 1,
+    "retain_state": true,
+    "publish_interval_seconds": 5,
+    "controls": { "stop": false },
+    "expose": {
+      "session": true,
+      "model": true,
+      "tool": true,
+      "token_usage": true,
+      "errors": true
+    }
   }
 }
 ```
+
+Project override (`.pi/settings.json`) — only set what differs:
+
+```json
+{
+  "mqtt": {
+    "broker": "mqtt://192.168.1.10:1883"
+  }
+}
+```
+
+Set `instance_id` only when you want a stable persistent Home Assistant device.
+By default the instance id is ephemeral per process (`hostname-pid-random`).
+This avoids MQTT clientId / topic collisions when you run multiple agents that
+share the same `~/.pi` dir. To pin an identity, set `PI_AGENT_MQTT_INSTANCE_ID`
+or `mqtt.instance_id` in settings (e.g. per systemd unit or docker env).
+
+Legacy files `.pi/mqtt.json` and `~/.pi/agent/mqtt.json` still work but are
+deprecated — migrate their contents under the `mqtt` key in `settings.json`.
 
 ### Environment Variables
 
@@ -83,10 +104,9 @@ Create `.pi/mqtt.json` in your project or `~/.pi/agent/mqtt.json` for global set
 
 ## Commands
 
-The plugin registers two slash commands:
-
-- `/mqtt-status`: Show connection state and published metrics.
-- `/mqtt-clean`: Delete discovery entities from Home Assistant.
+- `/mqtt` — info / reload / edit settings (`/mqtt edit` or `/mqtt edit global`)
+- `/mqtt-status` — show connection state and published metrics
+- `/mqtt-clean` — delete discovery entities from Home Assistant
 
 ## Home Assistant Automation Examples
 
