@@ -1,0 +1,37 @@
+{
+  "name": "pi-home-assistant-mqtt",
+  "version": "1.0.0",
+  "description": "Home Assistant MQTT Discovery plugin for Pi Agent",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "home-assistant",
+    "mqtt"
+  ],
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.3"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.84.4",
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  },
+  "license": "MIT"
+}
