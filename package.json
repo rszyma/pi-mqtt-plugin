@@ -16,10 +16,17 @@
       "./dist/index.js"
     ]
   },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE*"
+  ],
   "scripts": {
     "build": "tsc",
     "check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
