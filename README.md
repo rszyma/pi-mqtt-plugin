@@ -35,6 +35,14 @@ Install the package with the Pi package manager:
 pi install github:rszyma/pi-home-assistant-mqtt
 ```
 
+The package declares `./dist/index.js`, so an unbuilt local checkout
+(clone or local path) must run the build before Pi loads it:
+
+```bash
+npm run build
+pi install ./pi-home-assistant-mqtt
+```
+
 ## Configuration
 
 The plugin reads configuration from Pi settings files and environment variables.
