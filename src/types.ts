@@ -25,6 +25,8 @@ export interface MqttPluginConfig {
   password?: string;
   password_env?: string;
   instance_id: string;
+  /** Optional suffix appended to the hostname-derived default id (e.g. "1", "2"). */
+  instance_suffix?: string;
   device_name: string;
   base_topic: string;
   discovery_prefix: string;

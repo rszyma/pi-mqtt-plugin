@@ -153,7 +153,7 @@ export default function homeAssistantMqttExtension(pi, customConfig) {
             const statusText = [
                 `Broker: ${config.broker}`,
                 `Connected: ${connected ? "Yes" : "No"}`,
-                `Instance ID: ${config.instance_id} (ephemeral; set PI_AGENT_MQTT_INSTANCE_ID for stable)`,
+                `Instance ID: ${config.instance_id} (stable per host; set PI_AGENT_MQTT_INSTANCE_ID or PI_AGENT_MQTT_INSTANCE_SUFFIX for N VMs)`,
                 `Base Topic: ${config.base_topic}`,
                 `Discovery Prefix: ${config.discovery_prefix}`,
                 `Settings: global ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,

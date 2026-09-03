@@ -1,9 +1,26 @@
 import type { MqttPluginConfig } from "./types.js";
 export declare const SETTINGS_KEY = "mqtt";
 export type MqttSettings = Partial<MqttPluginConfig>;
-/** For tests: reset the process-scoped cached id. */
+/**
+ * Sanitize an identifier fragment for MQTT topics / HA ids.
+ * Allows letters, digits, dash, underscore; anything else becomes "-".
+ */
+export declare function sanitizeInstancePart(input: string): string;
+/**
+ * Resolve the stable instance ID.
+ *
+ * Priority:
+ * 1. explicitId (PI_AGENT_MQTT_INSTANCE_ID / mqtt.instance_id) — full override.
+ * 2. hostname + suffix (PI_AGENT_MQTT_INSTANCE_SUFFIX / mqtt.instance_suffix).
+ * 3. hostname alone.
+ *
+ * The default is stable per host: restarts reuse the same Home Assistant
+ * device instead of registering a new one. Pass a suffix (e.g. "1", "2")
+ * from the VM launcher when several live VMs share one hostname.
+ */
+export declare function getStableInstanceId(explicitId?: string, suffix?: string): string;
+/** Deprecated no-op kept for backwards compatibility (ids are now stable). */
 export declare function _resetEphemeralIdCache(): void;
-export declare function getStableInstanceId(explicitId?: string): string;
 export type LoadMqttSettingsResult = {
     config: Partial<MqttPluginConfig>;
     loadError: string | undefined;

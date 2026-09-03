@@ -31,7 +31,7 @@ No custom Home Assistant code is required.
 Install the package with the Pi package manager:
 
 ```bash
-pi install npm:pi-home-assistant-mqtt
+pi install github:rszyma/pi-home-assistant-mqtt
 ```
 
 ## Configuration
@@ -79,11 +79,13 @@ Project override (`.pi/settings.json`) — only set what differs:
 }
 ```
 
-Set `instance_id` only when you want a stable persistent Home Assistant device.
-By default the instance id is ephemeral per process (`hostname-pid-random`).
-This avoids MQTT clientId / topic collisions when you run multiple agents that
-share the same `~/.pi` dir. To pin an identity, set `PI_AGENT_MQTT_INSTANCE_ID`
-or `mqtt.instance_id` in settings (e.g. per systemd unit or docker env).
+Set `instance_id` only when you need a fully custom identity (it overrides
+the hostname default). When several live VMs share one hostname, give each a
+short suffix instead: `PI_AGENT_MQTT_INSTANCE_SUFFIX=1` (or
+`mqtt.instance_suffix`) gives `vm-opencode-1`. The default is the sanitized
+hostname, stable across restarts, so sequential sessions reuse one Home
+Assistant device. MQTT clientIds still get a per-process pid suffix so
+concurrent agents never evict each other from the broker.
 
 Legacy files `.pi/mqtt.json` and `~/.pi/agent/mqtt.json` still work but are
 deprecated — migrate their contents under the `mqtt` key in `settings.json`.
@@ -96,7 +98,8 @@ deprecated — migrate their contents under the `mqtt` key in `settings.json`.
 | `PI_AGENT_MQTT_USERNAME` | Username for MQTT authentication |
 | `PI_AGENT_MQTT_PASSWORD` | Password for MQTT authentication |
 | `PI_AGENT_MQTT_PASSWORD_ENV` | Name of environment variable with password |
-| `PI_AGENT_MQTT_INSTANCE_ID` | Stable identifier for the agent instance |
+| `PI_AGENT_MQTT_INSTANCE_ID` | Full override for the agent instance id |
+| `PI_AGENT_MQTT_INSTANCE_SUFFIX` | Suffix appended to hostname id (e.g. `1`, `2`) |
 | `PI_AGENT_MQTT_DEVICE_NAME` | Display name of the Home Assistant device |
 | `PI_AGENT_MQTT_BASE_TOPIC` | Base topic for state and availability |
 | `PI_AGENT_MQTT_DISCOVERY_PREFIX` | Home Assistant discovery prefix |

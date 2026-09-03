@@ -1,38 +1,48 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { randomUUID } from "node:crypto";
 const DEFAULT_BROKER = "mqtt://127.0.0.1:1883";
 const DEFAULT_DISCOVERY_PREFIX = "homeassistant";
 const DEFAULT_QOS = 1;
 const DEFAULT_PUBLISH_INTERVAL_SECONDS = 5;
 export const SETTINGS_KEY = "mqtt";
 /**
- * Generate a per-process ephemeral instance ID. No disk persistence.
- * Stable within a process, unique across concurrent processes sharing the
- * same ~/.pi dir. Use env var PI_AGENT_MQTT_INSTANCE_ID for a stable
- * persistent identity (e.g. in systemd units or docker env).
+ * Sanitize an identifier fragment for MQTT topics / HA ids.
+ * Allows letters, digits, dash, underscore; anything else becomes "-".
  */
-let cachedEphemeralId = null;
-function ephemeralId() {
-    if (cachedEphemeralId)
-        return cachedEphemeralId;
+export function sanitizeInstancePart(input) {
+    const cleaned = input.trim().replace(/[^A-Za-z0-9_-]/g, "-");
+    return cleaned.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+}
+function defaultHostPart() {
     const hostname = os.hostname().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "pi";
-    // pid makes concurrent processes unique even in same millisecond;
-    // random suffix guards fork/reuse edge cases.
-    cachedEphemeralId = `${hostname}-${process.pid}-${randomUUID().slice(0, 6)}`;
-    return cachedEphemeralId;
+    return sanitizeInstancePart(hostname) || "pi";
 }
-/** For tests: reset the process-scoped cached id. */
-export function _resetEphemeralIdCache() {
-    cachedEphemeralId = null;
-}
-export function getStableInstanceId(explicitId) {
+/**
+ * Resolve the stable instance ID.
+ *
+ * Priority:
+ * 1. explicitId (PI_AGENT_MQTT_INSTANCE_ID / mqtt.instance_id) — full override.
+ * 2. hostname + suffix (PI_AGENT_MQTT_INSTANCE_SUFFIX / mqtt.instance_suffix).
+ * 3. hostname alone.
+ *
+ * The default is stable per host: restarts reuse the same Home Assistant
+ * device instead of registering a new one. Pass a suffix (e.g. "1", "2")
+ * from the VM launcher when several live VMs share one hostname.
+ */
+export function getStableInstanceId(explicitId, suffix) {
     if (explicitId && explicitId.trim().length > 0) {
         return explicitId.trim();
     }
-    return ephemeralId();
+    const host = defaultHostPart();
+    const cleanSuffix = suffix ? sanitizeInstancePart(suffix) : "";
+    if (cleanSuffix) {
+        return `${host}-${cleanSuffix}`;
+    }
+    return host;
 }
+/** Deprecated no-op kept for backwards compatibility (ids are now stable). */
+export function _resetEphemeralIdCache() { }
 function tryReadJsonFile(filePath) {
     try {
         if (fs.existsSync(filePath)) {
@@ -114,6 +124,8 @@ export function sanitizeMqttConfig(input) {
         out.password_env = o.password_env;
     if (typeof o.instance_id === "string")
         out.instance_id = o.instance_id;
+    if (typeof o.instance_suffix === "string")
+        out.instance_suffix = o.instance_suffix;
     if (typeof o.device_name === "string")
         out.device_name = o.device_name;
     if (typeof o.base_topic === "string")
@@ -161,6 +173,7 @@ export function resolveConfig(cwd = process.cwd(), customConfig, agentDir) {
         process.env.MQTT_PASSWORD ||
         (envPasswordEnv && process.env[envPasswordEnv]);
     const envInstanceId = process.env.PI_AGENT_MQTT_INSTANCE_ID;
+    const envInstanceSuffix = process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX;
     const envDeviceName = process.env.PI_AGENT_MQTT_DEVICE_NAME;
     const envBaseTopic = process.env.PI_AGENT_MQTT_BASE_TOPIC;
     const envDiscoveryPrefix = process.env.PI_AGENT_MQTT_DISCOVERY_PREFIX;
@@ -169,9 +182,8 @@ export function resolveConfig(cwd = process.cwd(), customConfig, agentDir) {
         ...fileConfig,
         ...sanitizeMqttConfig(customConfig ?? {}),
     };
-    const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id);
-    const hostname = os.hostname() || "host";
-    const deviceName = envDeviceName || mergedPartial.device_name || `Pi Agent on ${hostname}`;
+    const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id, envInstanceSuffix || mergedPartial.instance_suffix);
+    const deviceName = envDeviceName || mergedPartial.device_name || `Pi Agent on ${instanceId}`;
     const baseTopic = envBaseTopic || mergedPartial.base_topic || `pi-agent/${instanceId}`;
     const discoveryPrefix = envDiscoveryPrefix || mergedPartial.discovery_prefix || DEFAULT_DISCOVERY_PREFIX;
     let resolvedPassword = envPassword || mergedPartial.password;
@@ -202,6 +214,7 @@ export function resolveConfig(cwd = process.cwd(), customConfig, agentDir) {
         password: resolvedPassword,
         password_env: mergedPartial.password_env || envPasswordEnv,
         instance_id: instanceId,
+        instance_suffix: envInstanceSuffix || mergedPartial.instance_suffix,
         device_name: deviceName,
         base_topic: baseTopic,
         discovery_prefix: discoveryPrefix,
