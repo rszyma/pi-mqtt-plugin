@@ -6,6 +6,7 @@ export type MqttSettings = Partial<MqttPluginConfig>;
  * Allows letters, digits, dash, underscore; anything else becomes "-".
  */
 export declare function sanitizeInstancePart(input: string): string;
+export declare function parseSlotNumber(suffix: string | undefined): number | null;
 /**
  * Resolve the stable instance ID.
  *

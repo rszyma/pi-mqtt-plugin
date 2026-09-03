@@ -11,6 +11,7 @@ export class StateManager {
       busy: false,
       session: null,
       model: null,
+      holder: null,
       tool: null,
       last_activity: new Date().toISOString(),
       turn_count: 0,
@@ -64,6 +65,11 @@ export class StateManager {
     this.state.last_activity = new Date().toISOString();
   }
 
+  public setHolder(holder: string | null): void {
+    this.state.holder = holder;
+    this.state.last_activity = new Date().toISOString();
+  }
+
   public updateTokens(inputTokens?: number, outputTokens?: number, contextPercent?: number): void {
     if (inputTokens !== undefined) {
       this.state.input_tokens = inputTokens;
@@ -100,6 +106,10 @@ export class StateManager {
 
     if (this.config.expose.model !== false) {
       payload.model = this.state.model ?? "none";
+    }
+
+    if (this.config.expose.holder !== false) {
+      payload.holder = this.state.holder ?? "free";
     }
 
     if (this.config.expose.tool !== false) {

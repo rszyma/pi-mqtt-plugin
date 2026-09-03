@@ -12,6 +12,9 @@ describe("StateManager", () => {
     qos: 1,
     retain_state: true,
     publish_interval_seconds: 30,
+    slot_count: 4,
+    will_delay_seconds: 90,
+    slot_overflow: false,
     controls: { stop: false },
     expose: {
       session: true,
@@ -98,6 +101,13 @@ describe("StateManager", () => {
     expect(payload.model).toBeUndefined();
     expect(payload.tool).toBeUndefined();
     expect(payload.input_tokens).toBeUndefined();
+  });
+
+  it("exposes holder in state payload defaulting to free", () => {
+    const manager = new StateManager(config);
+    expect(manager.buildFilteredStatePayload().holder).toBe("free");
+    manager.setHolder("myproj");
+    expect(manager.buildFilteredStatePayload().holder).toBe("myproj");
   });
 
   it("does not leak prompt text, responses, or tool arguments in payload", () => {

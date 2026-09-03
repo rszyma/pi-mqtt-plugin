@@ -5,6 +5,7 @@ export interface MqttControlsConfig {
 export interface MqttExposeConfig {
     session?: boolean;
     model?: boolean;
+    holder?: boolean;
     tool?: boolean;
     token_usage?: boolean;
     errors?: boolean;
@@ -18,6 +19,14 @@ export interface MqttPluginConfig {
     instance_id: string;
     /** Optional suffix appended to the hostname-derived default id (e.g. "1", "2"). */
     instance_suffix?: string;
+    /** Human-readable label of what holds this slot (e.g. project name). */
+    holder?: string;
+    /** Fixed pool size for host-allocated numeric slots. Default 4. */
+    slot_count: number;
+    /** MQTT 5 will-delay in seconds; LWT "offline" is held back this long. 0 disables. */
+    will_delay_seconds: number;
+    /** True when a numeric suffix exceeds slot_count without a full id override. */
+    slot_overflow: boolean;
     device_name: string;
     base_topic: string;
     discovery_prefix: string;
@@ -32,6 +41,7 @@ export interface AgentStateData {
     busy: boolean;
     session?: string | null;
     model?: string | null;
+    holder?: string | null;
     tool?: string | null;
     last_activity: string;
     turn_count: number;
@@ -59,6 +69,7 @@ export interface HomeAssistantSensorDiscovery {
     unit_of_measurement?: string;
     state_class?: string;
     icon?: string;
+    expire_after?: number;
     device: HomeAssistantDevice;
 }
 export interface HomeAssistantBinarySensorDiscovery {
@@ -73,6 +84,7 @@ export interface HomeAssistantBinarySensorDiscovery {
     payload_not_available: string;
     device_class?: string;
     icon?: string;
+    expire_after?: number;
     device: HomeAssistantDevice;
 }
 export interface HomeAssistantButtonDiscovery {

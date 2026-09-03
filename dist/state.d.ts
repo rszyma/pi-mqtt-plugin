@@ -11,6 +11,7 @@ export declare class StateManager {
     setTool(tool: string | null): void;
     incrementTurn(): void;
     setTurnCount(count: number): void;
+    setHolder(holder: string | null): void;
     updateTokens(inputTokens?: number, outputTokens?: number, contextPercent?: number): void;
     setError(error: string | null): void;
     buildFilteredStatePayload(): Record<string, unknown>;

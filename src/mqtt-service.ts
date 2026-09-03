@@ -54,11 +54,16 @@ export class MqttService {
       clean: true,
       reconnectPeriod: 5000,
       connectTimeout: 10000,
+      // MQTT 5 only: hold the LWT back so short sleeps / lid-closes do not
+      // flap every slot to offline. Omitted entirely when 0 (3.1.1 safe).
       will: {
         topic: availabilityTopic,
         payload: Buffer.from("offline"),
         qos: 1,
         retain: true,
+        ...(this.config.will_delay_seconds > 0
+          ? { properties: { willDelayInterval: this.config.will_delay_seconds } }
+          : {}),
       },
     };
 

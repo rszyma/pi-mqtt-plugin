@@ -54,7 +54,19 @@ export default function homeAssistantMqttExtension(pi, customConfig) {
         if (ctx.model) {
             stateManager.setModel(`${ctx.model.provider}/${ctx.model.id}`);
         }
+        if (config.holder) {
+            stateManager.setHolder(config.holder);
+        }
         stateManager.setStatus("idle");
+        if (config.slot_overflow) {
+            const msg = `No free MQTT slot: suffix ${config.instance_suffix} exceeds slot_count ${config.slot_count}. ` +
+                `MQTT disabled for this session — raise mqtt.slot_count / PI_AGENT_MQTT_SLOT_COUNT.`;
+            if (ctx.hasUI)
+                ctx.ui.notify(msg, "error");
+            else
+                console.error(msg);
+            return;
+        }
         mqttService = new MqttService({
             config,
             stateManager,
@@ -154,6 +166,9 @@ export default function homeAssistantMqttExtension(pi, customConfig) {
                 `Broker: ${config.broker}`,
                 `Connected: ${connected ? "Yes" : "No"}`,
                 `Instance ID: ${config.instance_id} (stable per host; set PI_AGENT_MQTT_INSTANCE_ID or PI_AGENT_MQTT_INSTANCE_SUFFIX for N VMs)`,
+                `Slot: ${config.instance_suffix ?? "-"} of ${config.slot_count}${config.slot_overflow ? " (OVERFLOW — MQTT disabled)" : ""}`,
+                `Holder: ${config.holder ?? "free"}`,
+                `Will delay: ${config.will_delay_seconds}s`,
                 `Base Topic: ${config.base_topic}`,
                 `Discovery Prefix: ${config.discovery_prefix}`,
                 `Settings: global ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,

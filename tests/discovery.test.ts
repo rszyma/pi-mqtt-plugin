@@ -17,6 +17,9 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     qos: 1,
     retain_state: true,
     publish_interval_seconds: 30,
+    slot_count: 4,
+    will_delay_seconds: 90,
+    slot_overflow: false,
     controls: {
       stop: false,
     },
@@ -60,6 +63,7 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     expect(statusPayload.availability_topic).toBe("pi-agent/dev-pi/availability");
     expect(statusPayload.payload_available).toBe("online");
     expect(statusPayload.payload_not_available).toBe("offline");
+    expect(statusPayload.expire_after).toBeGreaterThan(0);
 
     const busyMsg = messages.find((m) =>
       m.topic === "homeassistant/binary_sensor/dev-pi/busy/config",
@@ -126,7 +130,32 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     expect(messages.find((m) => m.topic.includes("/model/"))).toBeUndefined();
   });
 
+  it("includes holder sensor when exposed", () => {
+    const messages = buildDiscoveryMessages(baseConfig);
+    const holderMsg = messages.find((m) =>
+      m.topic === "homeassistant/sensor/dev-pi/holder/config",
+    );
+    expect(holderMsg).toBeDefined();
+    const holderPayload = JSON.parse(holderMsg!.payload);
+    expect(holderPayload.unique_id).toBe("pi_agent_dev_pi_holder");
+    expect(holderPayload.value_template).toBe("{{ value_json.holder | default('free') }}");
+  });
+
+  it("omits holder sensor when disabled in expose config", () => {
+    const noHolder: MqttPluginConfig = {
+      ...baseConfig,
+      expose: { ...baseConfig.expose, holder: false },
+    };
+    const messages = buildDiscoveryMessages(noHolder);
+    expect(messages.find((m) => m.topic.includes("/holder/"))).toBeUndefined();
+  });
+
   it("builds cleanup messages with empty retained payloads", () => {
+    // holder is covered by cleanup as well
+    const holderCleanup = buildCleanupMessages(baseConfig).find((m) =>
+      m.topic === "homeassistant/sensor/dev-pi/holder/config",
+    );
+    expect(holderCleanup).toBeDefined();
     const cleanup = buildCleanupMessages(baseConfig);
     expect(cleanup.length).toBeGreaterThan(0);
     for (const msg of cleanup) {

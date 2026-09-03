@@ -21,6 +21,10 @@ export function buildDiscoveryMessages(config) {
     const stateTopic = `${config.base_topic}/state`;
     const commandTopic = `${config.base_topic}/command`;
     const messages = [];
+    // expire_after greys sensors out if state stops arriving (sleep / net
+    // partition). Keep it comfortably above publish interval + will delay so
+    // short sleeps do not flap entities.
+    const expireAfter = Math.max(config.publish_interval_seconds * 3, config.will_delay_seconds + 120);
     // 1. Status Sensor
     const statusPayload = {
         name: "Status",
@@ -31,6 +35,7 @@ export function buildDiscoveryMessages(config) {
         payload_available: "online",
         payload_not_available: "offline",
         icon: "mdi:robot",
+        expire_after: expireAfter,
         device,
     };
     messages.push({
@@ -51,6 +56,7 @@ export function buildDiscoveryMessages(config) {
         payload_available: "online",
         payload_not_available: "offline",
         device_class: "running",
+        expire_after: expireAfter,
         device,
     };
     messages.push({
@@ -70,6 +76,7 @@ export function buildDiscoveryMessages(config) {
             payload_available: "online",
             payload_not_available: "offline",
             icon: "mdi:message-processing",
+            expire_after: expireAfter,
             device,
         };
         messages.push({
@@ -90,6 +97,7 @@ export function buildDiscoveryMessages(config) {
             payload_available: "online",
             payload_not_available: "offline",
             icon: "mdi:brain",
+            expire_after: expireAfter,
             device,
         };
         messages.push({
@@ -99,7 +107,30 @@ export function buildDiscoveryMessages(config) {
             qos: config.qos,
         });
     }
-    // 5. Last Activity Sensor
+    // 5. Holder Sensor (which project/owner holds this slot; "free" when unset).
+    // Lets a fixed dashboard card show who holds the slot without putting
+    // the project name into the device name.
+    if (config.expose.holder !== false) {
+        const holderPayload = {
+            name: "Holder",
+            unique_id: `pi_agent_${uniquePrefix}_holder`,
+            state_topic: stateTopic,
+            value_template: "{{ value_json.holder | default('free') }}",
+            availability_topic: availabilityTopic,
+            payload_available: "online",
+            payload_not_available: "offline",
+            icon: "mdi:account-box",
+            expire_after: expireAfter,
+            device,
+        };
+        messages.push({
+            topic: `${config.discovery_prefix}/sensor/${nodeId}/holder/config`,
+            payload: JSON.stringify(holderPayload),
+            retain: true,
+            qos: config.qos,
+        });
+    }
+    // 6. Last Activity Sensor
     const lastActivityPayload = {
         name: "Last Activity",
         unique_id: `pi_agent_${uniquePrefix}_last_activity`,
@@ -109,6 +140,7 @@ export function buildDiscoveryMessages(config) {
         availability_topic: availabilityTopic,
         payload_available: "online",
         payload_not_available: "offline",
+        expire_after: expireAfter,
         device,
     };
     messages.push({
@@ -117,7 +149,7 @@ export function buildDiscoveryMessages(config) {
         retain: true,
         qos: config.qos,
     });
-    // 6. Stop Button (if enabled)
+    // 7. Stop Button (if enabled)
     if (config.controls.stop) {
         const stopPayload = {
             name: "Stop",
@@ -146,6 +178,7 @@ export function buildCleanupMessages(config) {
         { component: "binary_sensor", name: "busy" },
         { component: "sensor", name: "session" },
         { component: "sensor", name: "model" },
+        { component: "sensor", name: "holder" },
         { component: "sensor", name: "last_activity" },
         { component: "button", name: "stop" },
     ];

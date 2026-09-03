@@ -5,6 +5,8 @@ const DEFAULT_BROKER = "mqtt://127.0.0.1:1883";
 const DEFAULT_DISCOVERY_PREFIX = "homeassistant";
 const DEFAULT_QOS = 1;
 const DEFAULT_PUBLISH_INTERVAL_SECONDS = 5;
+const DEFAULT_SLOT_COUNT = 4;
+const DEFAULT_WILL_DELAY_SECONDS = 90;
 export const SETTINGS_KEY = "mqtt";
 /**
  * Sanitize an identifier fragment for MQTT topics / HA ids.
@@ -13,6 +15,15 @@ export const SETTINGS_KEY = "mqtt";
 export function sanitizeInstancePart(input) {
     const cleaned = input.trim().replace(/[^A-Za-z0-9_-]/g, "-");
     return cleaned.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+}
+export function parseSlotNumber(suffix) {
+    if (!suffix)
+        return null;
+    const trimmed = suffix.trim();
+    if (!/^\d+$/.test(trimmed))
+        return null;
+    const n = Number.parseInt(trimmed, 10);
+    return Number.isSafeInteger(n) && n >= 1 ? n : null;
 }
 function defaultHostPart() {
     const hostname = os.hostname().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "pi";
@@ -126,6 +137,12 @@ export function sanitizeMqttConfig(input) {
         out.instance_id = o.instance_id;
     if (typeof o.instance_suffix === "string")
         out.instance_suffix = o.instance_suffix;
+    if (typeof o.holder === "string")
+        out.holder = o.holder;
+    if (typeof o.slot_count === "number" && Number.isFinite(o.slot_count))
+        out.slot_count = o.slot_count;
+    if (typeof o.will_delay_seconds === "number" && Number.isFinite(o.will_delay_seconds))
+        out.will_delay_seconds = o.will_delay_seconds;
     if (typeof o.device_name === "string")
         out.device_name = o.device_name;
     if (typeof o.base_topic === "string")
@@ -151,6 +168,8 @@ export function sanitizeMqttConfig(input) {
             out.expose.session = e.session;
         if (typeof e.model === "boolean")
             out.expose.model = e.model;
+        if (typeof e.holder === "boolean")
+            out.expose.holder = e.holder;
         if (typeof e.tool === "boolean")
             out.expose.tool = e.tool;
         if (typeof e.token_usage === "boolean")
@@ -174,6 +193,9 @@ export function resolveConfig(cwd = process.cwd(), customConfig, agentDir) {
         (envPasswordEnv && process.env[envPasswordEnv]);
     const envInstanceId = process.env.PI_AGENT_MQTT_INSTANCE_ID;
     const envInstanceSuffix = process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX;
+    const envHolder = process.env.PI_AGENT_MQTT_HOLDER;
+    const envSlotCount = process.env.PI_AGENT_MQTT_SLOT_COUNT;
+    const envWillDelay = process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS;
     const envDeviceName = process.env.PI_AGENT_MQTT_DEVICE_NAME;
     const envBaseTopic = process.env.PI_AGENT_MQTT_BASE_TOPIC;
     const envDiscoveryPrefix = process.env.PI_AGENT_MQTT_DISCOVERY_PREFIX;
@@ -182,7 +204,26 @@ export function resolveConfig(cwd = process.cwd(), customConfig, agentDir) {
         ...fileConfig,
         ...sanitizeMqttConfig(customConfig ?? {}),
     };
-    const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id, envInstanceSuffix || mergedPartial.instance_suffix);
+    const slotCountRaw = envSlotCount !== undefined && envSlotCount !== ""
+        ? Number.parseInt(envSlotCount, 10)
+        : mergedPartial.slot_count;
+    const slotCount = typeof slotCountRaw === "number" && Number.isFinite(slotCountRaw) && slotCountRaw >= 1
+        ? Math.floor(slotCountRaw)
+        : DEFAULT_SLOT_COUNT;
+    const willDelayRaw = envWillDelay !== undefined && envWillDelay !== ""
+        ? Number.parseInt(envWillDelay, 10)
+        : mergedPartial.will_delay_seconds;
+    const willDelaySeconds = typeof willDelayRaw === "number" && Number.isFinite(willDelayRaw) && willDelayRaw >= 0
+        ? Math.floor(willDelayRaw)
+        : DEFAULT_WILL_DELAY_SECONDS;
+    const explicitId = envInstanceId || mergedPartial.instance_id;
+    const suffix = envInstanceSuffix || mergedPartial.instance_suffix;
+    const instanceId = getStableInstanceId(explicitId, suffix);
+    // Fail-loud overflow: a numeric suffix beyond the pool without a full
+    // instance_id override. The caller (session_start) refuses MQTT in this
+    // case so we never silently invent a 5th device.
+    const slotNumber = parseSlotNumber(suffix);
+    const slotOverflow = !explicitId && slotNumber !== null && slotNumber > slotCount;
     const deviceName = envDeviceName || mergedPartial.device_name || `Pi Agent on ${instanceId}`;
     const baseTopic = envBaseTopic || mergedPartial.base_topic || `pi-agent/${instanceId}`;
     const discoveryPrefix = envDiscoveryPrefix || mergedPartial.discovery_prefix || DEFAULT_DISCOVERY_PREFIX;
@@ -203,6 +244,7 @@ export function resolveConfig(cwd = process.cwd(), customConfig, agentDir) {
     const expose = {
         session: mergedPartial.expose?.session ?? true,
         model: mergedPartial.expose?.model ?? true,
+        holder: mergedPartial.expose?.holder ?? true,
         tool: mergedPartial.expose?.tool ?? true,
         token_usage: mergedPartial.expose?.token_usage ?? true,
         errors: mergedPartial.expose?.errors ?? true,
@@ -214,7 +256,11 @@ export function resolveConfig(cwd = process.cwd(), customConfig, agentDir) {
         password: resolvedPassword,
         password_env: mergedPartial.password_env || envPasswordEnv,
         instance_id: instanceId,
-        instance_suffix: envInstanceSuffix || mergedPartial.instance_suffix,
+        instance_suffix: suffix,
+        holder: envHolder || mergedPartial.holder,
+        slot_count: slotCount,
+        will_delay_seconds: willDelaySeconds,
+        slot_overflow: slotOverflow,
         device_name: deviceName,
         base_topic: baseTopic,
         discovery_prefix: discoveryPrefix,

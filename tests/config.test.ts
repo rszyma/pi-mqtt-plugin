@@ -19,6 +19,9 @@ describe("Config resolution", () => {
     delete process.env.MQTT_PASSWORD;
     delete process.env.PI_AGENT_MQTT_INSTANCE_ID;
     delete process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX;
+    delete process.env.PI_AGENT_MQTT_HOLDER;
+    delete process.env.PI_AGENT_MQTT_SLOT_COUNT;
+    delete process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS;
     delete process.env.PI_AGENT_MQTT_DEVICE_NAME;
     delete process.env.PI_AGENT_MQTT_BASE_TOPIC;
     delete process.env.PI_AGENT_MQTT_DISCOVERY_PREFIX;
@@ -37,6 +40,10 @@ describe("Config resolution", () => {
     expect(config.qos).toBe(1);
     expect(config.retain_state).toBe(true);
     expect(config.publish_interval_seconds).toBe(5);
+    expect(config.slot_count).toBe(4);
+    expect(config.will_delay_seconds).toBe(90);
+    expect(config.slot_overflow).toBe(false);
+    expect(config.holder).toBeUndefined();
     expect(config.controls.stop).toBe(false);
     expect(config.expose.session).toBe(true);
     expect(config.expose.model).toBe(true);
@@ -109,5 +116,40 @@ describe("Config resolution", () => {
     expect(sanitizeInstancePart("vm 2!")).toBe("vm-2");
     const host = sanitizeInstancePart(os.hostname().toLowerCase()) || "pi";
     expect(getStableInstanceId(undefined, "vm 2!")).toBe(`${host}-vm-2`);
+  });
+
+  it("resolves slot_count, will_delay and holder from env", () => {
+    process.env.PI_AGENT_MQTT_SLOT_COUNT = "6";
+    process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS = "30";
+    process.env.PI_AGENT_MQTT_HOLDER = "myproj";
+    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
+    expect(config.slot_count).toBe(6);
+    expect(config.will_delay_seconds).toBe(30);
+    expect(config.holder).toBe("myproj");
+  });
+
+  it("falls back to defaults on invalid slot_count / will_delay", () => {
+    process.env.PI_AGENT_MQTT_SLOT_COUNT = "banana";
+    process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS = "-5";
+    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
+    expect(config.slot_count).toBe(4);
+    expect(config.will_delay_seconds).toBe(90);
+  });
+
+  it("flags slot overflow for numeric suffix beyond slot_count", () => {
+    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "5";
+    const overflow = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
+    expect(overflow.slot_overflow).toBe(true);
+    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "2";
+    const ok = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
+    expect(ok.slot_overflow).toBe(false);
+  });
+
+  it("does not flag overflow when instance_id fully overrides", () => {
+    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "9";
+    process.env.PI_AGENT_MQTT_INSTANCE_ID = "custom-node";
+    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
+    expect(config.slot_overflow).toBe(false);
+    expect(config.instance_id).toBe("custom-node");
   });
 });
