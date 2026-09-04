@@ -76,6 +76,7 @@ export interface HomeAssistantSensorDiscovery {
   state_class?: string;
   icon?: string;
   expire_after?: number;
+  entity_category?: "diagnostic";
   device: HomeAssistantDevice;
 }
 

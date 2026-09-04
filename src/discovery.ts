@@ -94,6 +94,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
       payload_not_available: "offline",
       icon: "mdi:message-processing",
       expire_after: expireAfter,
+      entity_category: "diagnostic",
       device,
     };
     messages.push({
@@ -116,6 +117,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
       payload_not_available: "offline",
       icon: "mdi:brain",
       expire_after: expireAfter,
+      entity_category: "diagnostic",
       device,
     };
     messages.push({
@@ -138,6 +140,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
       payload_not_available: "offline",
       icon: "mdi:folder-outline",
       expire_after: expireAfter,
+      entity_category: "diagnostic",
       device,
     };
     messages.push({
@@ -159,6 +162,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     payload_available: "online",
     payload_not_available: "offline",
     expire_after: expireAfter,
+    entity_category: "diagnostic",
     device,
   };
   messages.push({

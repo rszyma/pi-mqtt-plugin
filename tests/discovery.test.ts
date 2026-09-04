@@ -128,6 +128,17 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     expect(messages.find((m) => m.topic.includes("/model/"))).toBeUndefined();
   });
 
+  it("marks session, model, project and last_activity as diagnostic", () => {
+    const messages = buildDiscoveryMessages(baseConfig);
+    for (const name of ["session", "model", "project", "last_activity"]) {
+      const msg = messages.find((m) => m.topic.endsWith(`/${name}/config`));
+      expect(msg).toBeDefined();
+      expect(JSON.parse(msg!.payload).entity_category).toBe("diagnostic");
+    }
+    const statusMsg = messages.find((m) => m.topic.endsWith("/status/config"));
+    expect(JSON.parse(statusMsg!.payload).entity_category).toBeUndefined();
+  });
+
   it("includes project sensor when exposed", () => {
     const messages = buildDiscoveryMessages(baseConfig);
     const projectMsg = messages.find((m) =>
