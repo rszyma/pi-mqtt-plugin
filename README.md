@@ -95,6 +95,15 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 - `/mqtt-status` — connection state and metrics
 - `/mqtt-clean` — delete this session's discovery entities
 
+## Development
+
+```bash
+npm install      # install deps
+npm test         # run tests (vitest)
+npm run check    # typecheck (tsc --noEmit)
+npm run build    # compile to dist/ (also runs on prepack)
+```
+
 ## Dashboards
 
 Entity ids are per-session, so pin
