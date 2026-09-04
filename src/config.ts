@@ -196,7 +196,12 @@ export function resolveConfig(
   const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id);
 
   const hostname = os.hostname() || "host";
-  const deviceName = envDeviceName || mergedPartial.device_name || `Pi Agent on ${hostname}`;
+  const holderDefault = path.basename(cwd) || undefined;
+  const holder = envHolder || mergedPartial.holder || holderDefault;
+  const deviceName =
+    envDeviceName ||
+    mergedPartial.device_name ||
+    (holder ? `Pi Agent ${holder} on ${hostname}` : `Pi Agent on ${hostname}`);
 
   const baseTopic = envBaseTopic || mergedPartial.base_topic || `pi-agent/${instanceId}`;
 
@@ -237,7 +242,7 @@ export function resolveConfig(
     password: resolvedPassword,
     password_env: mergedPartial.password_env || envPasswordEnv,
     instance_id: instanceId,
-    holder: envHolder || mergedPartial.holder,
+    holder,
     will_delay_seconds: willDelaySeconds,
     device_name: deviceName,
     base_topic: baseTopic,

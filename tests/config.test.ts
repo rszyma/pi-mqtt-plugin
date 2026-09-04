@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import * as os from "node:os";
 import { _resetEphemeralIdCache, getStableInstanceId, resolveConfig } from "../src/config.js";
 
 const TEST_AGENT_DIR = "/tmp/nonexistent-pi-home/.pi/agent";
@@ -37,7 +38,8 @@ describe("Config resolution", () => {
     expect(config.retain_state).toBe(true);
     expect(config.publish_interval_seconds).toBe(5);
     expect(config.will_delay_seconds).toBe(90);
-    expect(config.holder).toBeUndefined();
+    expect(config.holder).toBe("nonexistent");
+    expect(config.device_name).toBe(`Pi Agent nonexistent on ${os.hostname() || "host"}`);
     expect(config.controls.stop).toBe(false);
     expect(config.expose.session).toBe(true);
     expect(config.expose.model).toBe(true);
