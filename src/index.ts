@@ -176,6 +176,7 @@ export default function homeAssistantMqttExtension(
       const statusText = [
         `Broker: ${config.broker}`,
         `Connected: ${connected ? "Yes" : "No"}`,
+        `Device: ${config.device_name}`,
         `Instance ID: ${config.instance_id} (ephemeral per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
         `Holder: ${config.holder ?? "unknown"}`,
         `Will delay: ${config.will_delay_seconds}s`,
