@@ -201,7 +201,7 @@ export function resolveConfig(
   const deviceName =
     envDeviceName ||
     mergedPartial.device_name ||
-    (holder ? `Pi Agent ${holder} on ${hostname}` : `Pi Agent on ${hostname}`);
+    (holder ? `Pi Agent [${holder}] (${hostname})` : `Pi Agent (${hostname})`);
 
   const baseTopic = envBaseTopic || mergedPartial.base_topic || `pi-agent/${instanceId}`;
 

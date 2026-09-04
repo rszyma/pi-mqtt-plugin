@@ -39,7 +39,7 @@ describe("Config resolution", () => {
     expect(config.publish_interval_seconds).toBe(5);
     expect(config.will_delay_seconds).toBe(90);
     expect(config.holder).toBe("nonexistent");
-    expect(config.device_name).toBe(`Pi Agent nonexistent on ${os.hostname() || "host"}`);
+    expect(config.device_name).toBe(`Pi Agent [nonexistent] (${os.hostname() || "host"})`);
     expect(config.controls.stop).toBe(false);
     expect(config.expose.session).toBe(true);
     expect(config.expose.model).toBe(true);
