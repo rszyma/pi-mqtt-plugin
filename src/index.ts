@@ -43,6 +43,30 @@ export default function homeAssistantMqttExtension(
     return { loadError };
   }
 
+  /** Same total as the footer: sum usage.cost.total over session entries. */
+  function refreshCostUsd(
+    entries: Array<{
+      type?: string;
+      message?: { role?: string; usage?: { cost?: { total?: number } } };
+      usage?: { cost?: { total?: number } };
+    }>,
+  ): void {
+    if (!stateManager) return;
+    try {
+      let total = 0;
+      for (const e of entries) {
+        if (e.type === "message" && (e.message?.role === "assistant" || e.message?.role === "toolResult")) {
+          const cost = e.message?.usage?.cost?.total;
+          if (typeof cost === "number") total += cost;
+        } else if ((e.type === "branch_summary" || e.type === "compaction") && e.usage) {
+          const cost = e.usage?.cost?.total;
+          if (typeof cost === "number") total += cost;
+        }
+      }
+      stateManager.setCostUsd(total);
+    } catch { /* entries unreadable: keep last known cost */ }
+  }
+
   async function startSessionDevice(ctx: ExtensionContext): Promise<void> {
     const sessionId = ctx.sessionManager.getSessionId();
     // Session switches arrive as session_start with reason new/resume/fork.
@@ -70,6 +94,8 @@ export default function homeAssistantMqttExtension(
     }
 
     stateManager.setStatus("idle");
+    // Restore the true total on reload/resume: fresh state starts at 0.
+    refreshCostUsd(ctx.sessionManager.getEntries() as Parameters<typeof refreshCostUsd>[0]);
 
     mqttService = new MqttService({
       config,
@@ -149,24 +175,7 @@ export default function homeAssistantMqttExtension(
       }
     }
     // Same total as the footer: sum usage.cost.total over session entries.
-    try {
-      let total = 0;
-      for (const entry of ctx.sessionManager.getEntries()) {
-        const e = entry as {
-          type?: string;
-          message?: { role?: string; usage?: { cost?: { total?: number } } };
-          usage?: { cost?: { total?: number } };
-        };
-        if (e.type === "message" && (e.message?.role === "assistant" || e.message?.role === "toolResult")) {
-          const cost = e.message?.usage?.cost?.total;
-          if (typeof cost === "number") total += cost;
-        } else if ((e.type === "branch_summary" || e.type === "compaction") && e.usage) {
-          const cost = e.usage?.cost?.total;
-          if (typeof cost === "number") total += cost;
-        }
-      }
-      stateManager.setCostUsd(total);
-    } catch { /* entries unreadable: keep last known cost */ }
+    refreshCostUsd(ctx.sessionManager.getEntries() as Parameters<typeof refreshCostUsd>[0]);
     mqttService?.publishState();
   });
 
