@@ -43,20 +43,6 @@ export function getStableInstanceId(explicitId?: string): string {
   return ephemeralId();
 }
 
-function tryReadJsonFile<T>(filePath: string): T | null {
-  try {
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, "utf8");
-      return JSON.parse(content) as T;
-    }
-  } catch {
-    // Intentionally silent: file reads happen before ctx.ui exists.
-    // Warnings for invalid JSON are surfaced in session_start via
-    // loadMqttSettings (same pattern as pi-ding).
-  }
-  return null;
-}
-
 export type LoadMqttSettingsResult = {
   config: Partial<MqttPluginConfig>;
   loadError: string | undefined;
@@ -67,8 +53,6 @@ export type LoadMqttSettingsResult = {
  * - Global:  ~/.pi/agent/settings.json  -> settings["mqtt"]
  * - Project: <cwd>/.pi/settings.json     -> settings["mqtt"]
  * Project overrides global (shallow merge, same as pi-ding).
- * Falls back to legacy dedicated files (~/.pi/agent/mqtt.json, .pi/mqtt.json)
- * for backwards compatibility.
  */
 export function loadMqttSettings(
   cwd: string,
@@ -103,21 +87,8 @@ export function loadMqttSettings(
       ? (projectSettings[SETTINGS_KEY] as Partial<MqttPluginConfig>)
       : {};
 
-  // Back-compat: legacy dedicated mqtt.json files (deprecated, lowest priority
-  // inside their scope so settings.json wins if both exist).
-  const legacyGlobal = tryReadJsonFile<Partial<MqttPluginConfig>>(
-    path.join(agentDir, "mqtt.json"),
-  );
-  const legacyProject = tryReadJsonFile<Partial<MqttPluginConfig>>(
-    path.join(cwd, ".pi", "mqtt.json"),
-  );
-
-  // Merge order (lowest -> highest priority):
-  // legacyGlobal < settings global < legacyProject < settings project
   const merged: Partial<MqttPluginConfig> = {
-    ...(legacyGlobal ?? {}),
     ...(globalMqtt ?? {}),
-    ...(legacyProject ?? {}),
     ...(projectMqtt ?? {}),
   };
 
