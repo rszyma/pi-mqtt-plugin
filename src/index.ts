@@ -67,20 +67,6 @@ export default function homeAssistantMqttExtension(
     } catch { /* entries unreadable: keep last known cost */ }
   }
 
-  /** Restore counts lost with the fresh state: turns = assistant messages. */
-  function restoreTurnCount(
-    entries: Array<{ type?: string; message?: { role?: string } }>,
-  ): void {
-    if (!stateManager) return;
-    try {
-      let turns = 0;
-      for (const e of entries) {
-        if (e.type === "message" && e.message?.role === "assistant") turns += 1;
-      }
-      stateManager.setTurnCount(turns);
-    } catch { /* entries unreadable: keep last known count */ }
-  }
-
   async function startSessionDevice(ctx: ExtensionContext): Promise<void> {
     const sessionId = ctx.sessionManager.getSessionId();
     // Session switches arrive as session_start with reason new/resume/fork.
@@ -108,9 +94,8 @@ export default function homeAssistantMqttExtension(
     }
 
     stateManager.setStatus("idle");
-    // Restore the true values on reload/resume: fresh state starts at 0.
+    // Restore the true total on reload/resume: fresh state starts at 0.
     refreshCostUsd(ctx.sessionManager.getEntries() as Parameters<typeof refreshCostUsd>[0]);
-    restoreTurnCount(ctx.sessionManager.getEntries() as Parameters<typeof restoreTurnCount>[0]);
 
     mqttService = new MqttService({
       config,
@@ -154,7 +139,6 @@ export default function homeAssistantMqttExtension(
 
   pi.on("turn_start", async () => {
     if (stateManager) {
-      stateManager.incrementTurn();
       if (stateManager.getRawState().status !== "tool") {
         stateManager.setStatus("working");
       }
@@ -265,7 +249,6 @@ export default function homeAssistantMqttExtension(
         `Current Status: ${rawState.status}`,
         `Active Session: ${rawState.session ?? "none"}`,
         `Active Model: ${rawState.model ?? "none"}`,
-        `Turns: ${rawState.turn_count}`,
       ].join("\n");
 
       ctx.ui.notify(statusText, connected ? "info" : "warning");

@@ -27,7 +27,6 @@ describe("StateManager", () => {
     const raw = manager.getRawState();
     expect(raw.status).toBe("idle");
     expect(raw.busy).toBe(false);
-    expect(raw.turn_count).toBe(0);
   });
 
   it("updates status and busy flag correctly", () => {
@@ -55,13 +54,6 @@ describe("StateManager", () => {
 
     manager.setTool(null);
     expect(manager.getRawState().tool).toBeNull();
-  });
-
-  it("increments turn count", () => {
-    const manager = new StateManager(config);
-    manager.incrementTurn();
-    manager.incrementTurn();
-    expect(manager.getRawState().turn_count).toBe(2);
   });
 
   it("updates token usage stats", () => {

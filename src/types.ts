@@ -52,7 +52,6 @@ export interface AgentStateData {
   cost_usd?: number | null;
   tool?: string | null;
   last_activity: string;
-  turn_count: number;
   input_tokens?: number;
   output_tokens?: number;
   context_percent?: number;

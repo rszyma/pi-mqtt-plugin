@@ -15,7 +15,6 @@ export class StateManager {
       cost_usd: null,
       tool: null,
       last_activity: new Date().toISOString(),
-      turn_count: 0,
       input_tokens: 0,
       output_tokens: 0,
       context_percent: 0,
@@ -56,16 +55,6 @@ export class StateManager {
     this.state.last_activity = new Date().toISOString();
   }
 
-  public incrementTurn(): void {
-    this.state.turn_count += 1;
-    this.state.last_activity = new Date().toISOString();
-  }
-
-  public setTurnCount(count: number): void {
-    this.state.turn_count = count;
-    this.state.last_activity = new Date().toISOString();
-  }
-
   public setCostUsd(cost: number | null): void {
     this.state.cost_usd = cost;
     this.state.last_activity = new Date().toISOString();
@@ -103,7 +92,6 @@ export class StateManager {
       status: this.state.status,
       busy: this.state.busy,
       last_activity: this.state.last_activity,
-      turn_count: this.state.turn_count,
     };
 
     // Session id is always present: one device is one session, and the
