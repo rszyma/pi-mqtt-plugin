@@ -6,7 +6,7 @@ No custom Home Assistant code is required.
 ## How it works
 
 Each agent session registers its own Home Assistant device. The instance id
-is ephemeral per process (`hostname-pid-random`), so concurrent agents — on
+is ephemeral per process (`hostname-boot-pid-random`), so concurrent agents — on
 one machine or many — never share topics or clientIds. Dead sessions report
 `offline` via Last Will and Testament and show as `unavailable`.
 
@@ -29,7 +29,7 @@ Unbuilt checkouts (clone or local path) need a build first:
 
 ```bash
 npm run build
-pi install ./pi-home-assistant-mqtt
+pi install .
 ```
 
 ## Configuration
@@ -44,7 +44,7 @@ pi install ./pi-home-assistant-mqtt
     // "username": "pi-agent", // default: unset (anonymous)
     // "password_env": "PI_AGENT_MQTT_PASSWORD", // default: unset
     // "device_name": "Pi Agent on Workstation", // default: Pi Agent on <hostname>
-    // "instance_id": "stable-id", // default: hostname-pid-random (ephemeral)
+    // "instance_id": "stable-id", // default: hostname-boot-pid-random (ephemeral)
     // "holder": "my-project", // default: unset (Holder sensor reads "unknown")
     "discovery_prefix": "homeassistant",
     "qos": 1,

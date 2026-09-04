@@ -85,6 +85,7 @@ describe("Config resolution", () => {
     _resetEphemeralIdCache();
     const b = getStableInstanceId();
     expect(a).not.toBe(b);
+    expect(a.split("-").length).toBeGreaterThanOrEqual(4);
   });
 
   it("resolves will_delay and holder from env", () => {

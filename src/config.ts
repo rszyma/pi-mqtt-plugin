@@ -16,18 +16,35 @@ export type MqttSettings = Partial<MqttPluginConfig>;
 
 /**
  * Generate a per-process ephemeral instance ID. No disk persistence.
- * Stable within a process, unique across concurrent processes sharing the
- * same ~/.pi dir. Use env var PI_AGENT_MQTT_INSTANCE_ID for a stable
- * persistent identity (e.g. in systemd units or docker env).
+ * Stable within a process, unique across concurrent processes, VMs cloned
+ * from one image, and PID namespaces. Use env var PI_AGENT_MQTT_INSTANCE_ID
+ * for a stable persistent identity (e.g. in systemd units or docker env).
  */
 let cachedEphemeralId: string | null = null;
+
+/** First 8 hex chars of the Linux boot ID; empty when unavailable. */
+function bootIdPart(): string {
+  try {
+    const raw = fs.readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase();
+    const hex = raw.replace(/-/g, "");
+    if (/^[0-9a-f]{32}$/.test(hex)) return hex.slice(0, 8);
+  } catch {
+    // Non-Linux or unreadable: fall through to no boot part.
+  }
+  return "";
+}
 
 function ephemeralId(): string {
   if (cachedEphemeralId) return cachedEphemeralId;
   const hostname = os.hostname().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "pi";
-  // pid makes concurrent processes unique even in same millisecond;
-  // random suffix guards fork/reuse edge cases.
-  cachedEphemeralId = `${hostname}-${process.pid}-${randomUUID().slice(0, 6)}`;
+  // boot id separates VMs cloned from one image (same hostname, overlapping
+  // pid space); pid separates processes on one boot; random guards pid
+  // reuse and fork edge cases.
+  const parts = [hostname];
+  const boot = bootIdPart();
+  if (boot) parts.push(boot);
+  parts.push(String(process.pid), randomUUID().replace(/-/g, "").slice(0, 8));
+  cachedEphemeralId = parts.join("-");
   return cachedEphemeralId;
 }
 
