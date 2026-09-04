@@ -276,9 +276,10 @@ describe("MqttService", () => {
 
     const found = service.findDeadSessions(20);
     // Retained status configs arrive first; each carries its availability topic.
+    // Node ids are sanitizeNodeId(instance): "dead-node" stays as-is.
     mockClientInstance!.emit(
       "message",
-      "homeassistant/sensor/dead_node/status/config",
+      "homeassistant/sensor/dead-node/status/config",
       Buffer.from(
         JSON.stringify({
           availability_topic: "custom/dead-node/availability",
@@ -288,7 +289,7 @@ describe("MqttService", () => {
     );
     mockClientInstance!.emit(
       "message",
-      "homeassistant/sensor/live_node/status/config",
+      "homeassistant/sensor/live-node/status/config",
       Buffer.from(
         JSON.stringify({
           availability_topic: "custom/live-node/availability",
@@ -306,6 +307,18 @@ describe("MqttService", () => {
         }),
       ),
     );
+    // Foreign config under our prefix: right identifier shape but the node
+    // id does not match the sanitized instance, so it must be skipped.
+    mockClientInstance!.emit(
+      "message",
+      "homeassistant/sensor/trap/status/config",
+      Buffer.from(
+        JSON.stringify({
+          availability_topic: "custom/dead-node/availability",
+          device: { identifiers: ["pi-agent:someone-else"] },
+        }),
+      ),
+    );
     // Availability probe responses.
     mockClientInstance!.emit(
       "message",
@@ -318,7 +331,7 @@ describe("MqttService", () => {
       Buffer.from("online"),
     );
     await expect(found).resolves.toEqual([
-      { instanceId: "dead_node", availabilityTopic: "custom/dead-node/availability" },
+      { instanceId: "dead-node", availabilityTopic: "custom/dead-node/availability" },
     ]);
   });
 });

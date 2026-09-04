@@ -236,6 +236,7 @@ export class MqttService {
       const statusRe = new RegExp(
         `^${escapeRegExp(this.config.discovery_prefix)}/sensor/([^/]+)/status/config$`,
       );
+      const instanceRe = /^pi-agent:(.+)$/;
       const candidates = new Map<string, string>();
       const scanTopic = `${this.config.discovery_prefix}/sensor/+/status/config`;
       const onMessage = (topic: string, payload: Buffer) => {
@@ -248,10 +249,15 @@ export class MqttService {
             };
             const availabilityTopic = parsed.availability_topic;
             if (typeof availabilityTopic !== "string" || availabilityTopic.length === 0) return;
-            // Only our devices: identifier "pi-agent:<instance>".
+            // Only our devices: identifier "pi-agent:<instance>", and the
+            // node id in the topic must be that instance's sanitized form.
+            // Without this check a foreign config under our prefix could
+            // point availability at an unrelated topic and get pruned.
             const ids = parsed.device?.identifiers;
-            const ours = Array.isArray(ids) && ids.some((id) => typeof id === "string" && id.startsWith("pi-agent:"));
-            if (!ours) return;
+            const rawId = Array.isArray(ids)
+              ? ids.map((id) => typeof id === "string" ? instanceRe.exec(id)?.[1] : undefined).find((id) => id !== undefined)
+              : undefined;
+            if (rawId === undefined || sanitizeNodeId(rawId) !== statusMatch[1]) return;
             candidates.set(availabilityTopic, statusMatch[1]);
             this.client?.subscribe(availabilityTopic, { qos: 1 });
           } catch { /* ignore malformed retained configs */ }
