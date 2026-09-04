@@ -255,6 +255,12 @@ export default function homeAssistantMqttExtension(
         return;
       }
 
+      const confirm = await ctx.ui.confirm(
+        "Prune dead sessions",
+        `Remove HA discovery for ${dead.length} dead session(s)?\n${dead.map((d) => d.instanceId).join("\n")}`,
+      );
+      if (!confirm) return;
+
       const pruned = await mqttService.pruneDiscovery(dead);
       ctx.ui.notify(`Pruned ${pruned} dead session(s): ${dead.map((d) => d.instanceId).join(", ")}`, "info");
     },
