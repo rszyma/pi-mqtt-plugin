@@ -24,13 +24,12 @@ and prune the rest with a periodic cleanup job (see below).
 ## Installation
 
 ```bash
-pi install github:rszyma/pi-mqtt-plugin
+pi install https://github.com/rszyma/pi-mqtt-plugin
 ```
 
-Unbuilt checkouts (clone or local path) need a build first:
+Clone or local path install builds `dist` through `npm install`:
 
 ```bash
-npm run build
 pi install .
 ```
 

@@ -27,6 +27,7 @@
     "build": "tsc",
     "check": "tsc --noEmit",
     "test": "vitest run",
+    "prepare": "npm run build",
     "prepack": "npm run build"
   },
   "peerDependencies": {
