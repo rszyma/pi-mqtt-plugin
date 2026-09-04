@@ -21,7 +21,7 @@ export function buildDevicePayload(config: MqttPluginConfig): HomeAssistantDevic
     name: config.device_name,
     manufacturer: "Pi",
     model: "Pi Agent",
-    sw_version: "1.0.0",
+    sw_version: "0.1.0",
   };
 }
 

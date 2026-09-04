@@ -24,7 +24,7 @@ and prune the rest with a periodic cleanup job (see below).
 ## Installation
 
 ```bash
-pi install github:rszyma/pi-home-assistant-mqtt
+pi install github:rszyma/pi-mqtt-plugin
 ```
 
 Unbuilt checkouts (clone or local path) need a build first:
