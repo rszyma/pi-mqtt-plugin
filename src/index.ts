@@ -50,11 +50,7 @@ export default function homeAssistantMqttExtension(
     config = resolveConfig(ctx.cwd, customConfig);
     stateManager = new StateManager(config);
 
-    const sessionFile = ctx.sessionManager.getSessionFile();
-    const sessionId = ctx.sessionManager.getSessionId();
-    stateManager.setSession(
-      sessionFile ? (sessionFile.split("/").pop() ?? sessionId) : sessionId,
-    );
+    stateManager.setSession(ctx.sessionManager.getSessionId());
 
     if (ctx.model) {
       stateManager.setModel(`${ctx.model.provider}/${ctx.model.id}`);
