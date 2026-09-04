@@ -12,9 +12,7 @@ describe("StateManager", () => {
     qos: 1,
     retain_state: true,
     publish_interval_seconds: 30,
-    slot_count: 4,
     will_delay_seconds: 90,
-    slot_overflow: false,
     controls: { stop: false },
     expose: {
       session: true,

@@ -126,9 +126,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     });
   }
 
-  // 5. Holder Sensor (which project/owner holds this slot; "free" when unset).
-  // Lets a fixed dashboard card show who holds the slot without putting
-  // the project name into the device name.
+  // 5. Holder Sensor (what this session works on; "free" when unset).
   if (config.expose.holder !== false) {
     const holderPayload: HomeAssistantSensorDiscovery = {
       name: "Holder",

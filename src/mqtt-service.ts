@@ -44,18 +44,13 @@ export class MqttService {
     const availabilityTopic = `${this.config.base_topic}/availability`;
     const commandTopic = `${this.config.base_topic}/command`;
 
-    // Topics/discovery stay stable per instance_id, but the MQTT clientId must
-    // be unique per process or concurrent agents evict each other from the
-    // broker (clean session takeover).
-    const clientId = `pi-agent-${this.config.instance_id}-${process.pid}`;
-
     const clientOpts: IClientOptions = {
-      clientId,
+      clientId: `pi-agent-${this.config.instance_id}`,
       clean: true,
       reconnectPeriod: 5000,
       connectTimeout: 10000,
       // MQTT 5 only: hold the LWT back so short sleeps / lid-closes do not
-      // flap every slot to offline. Omitted entirely when 0 (3.1.1 safe).
+      // flap sessions to offline. Omitted entirely when 0 (3.1.1 safe).
       will: {
         topic: availabilityTopic,
         payload: Buffer.from("offline"),

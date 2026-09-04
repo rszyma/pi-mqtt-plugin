@@ -9,11 +9,11 @@ No custom Home Assistant code is required.
 
 ## Features
 - Automatic entity discovery in Home Assistant
-- Fixed pool of slot devices (`hostname-1` … `hostname-N`) for stable dashboards
+- One Home Assistant device per agent session (ephemeral by default)
 - State updates for `idle`, `working`, `tool`, `waiting`, `error`, and `stopping`
 - MQTT Last Will and Testament for availability detection (with will-delay for sleep)
 - Safe defaults without prompt or response leakage
-- Host-side slot allocator (`bin/pi-slot`) so parallel VMs never share an identity
+- Multi-instance support: concurrent agents never share topics or clientIds
 
 ## Entities
 
@@ -23,7 +23,7 @@ No custom Home Assistant code is required.
 | Busy | Binary Sensor | Reports if agent runs an active task |
 | Session | Sensor | Reports active session identifier |
 | Model | Sensor | Reports active model identifier |
-| Holder | Sensor | Reports which project holds this slot (`free` when unset) |
+| Holder | Sensor | Reports what this session works on (`free` when unset, e.g. project name) |
 | Last Activity | Sensor | Reports timestamp of latest state change |
 | Stop | Button | Optional control button to cancel current work |
 
@@ -42,6 +42,47 @@ The package declares `./dist/index.js`, so an unbuilt local checkout
 npm run build
 pi install ./pi-home-assistant-mqtt
 ```
+
+## Identity model: one device per session
+
+Every agent process registers its own Home Assistant device. By default the
+instance id is ephemeral per process (`hostname-pid-random`), so concurrent
+agents — on one machine or many — never share topics or MQTT clientIds and
+never overwrite each other's state. This works with any number of supervisor
+machines: no coordination, no shared locks, no single-PC assumption.
+
+The tradeoff is device churn: every session leaves a retained discovery
+config behind. Dead sessions report `offline` via Last Will and Testament,
+so they grey out as `unavailable` — they do not send phantom state. Two
+mechanisms keep the list manageable (see Dashboards and Cleanup below):
+
+- Show only live agents with
+  [lovelace-auto-entities](https://github.com/thomasloven/lovelace-auto-entities),
+  filtered on availability.
+- Periodically delete stale discovery configs (retained MQTT cleanup job).
+
+Set `mqtt.instance_id` (or `PI_AGENT_MQTT_INSTANCE_ID`) only when you want a
+stable persistent device instead — e.g. one long-lived box per systemd unit
+or container. All sessions sharing that id share one device
+(last-writer-wins on state), so only do this when a single agent owns the id.
+
+```json
+{
+  "mqtt": {
+    "will_delay_seconds": 90,
+    "holder": "my-project",
+    "expose": { "holder": true }
+  }
+}
+```
+
+`will_delay_seconds` (default 90, MQTT 5 only, `0` disables) holds the LWT
+`offline` back so short sleeps and lid-closes do not flap sessions to
+`unavailable`. Graceful shutdown still publishes `offline` immediately.
+
+`holder` (or `PI_AGENT_MQTT_HOLDER`) labels what the session works on —
+typically the project name. It shows in its own sensor so dynamic lists can
+render it without parsing device names.
 
 ## Configuration
 
@@ -88,74 +129,63 @@ Project override (`.pi/settings.json`) — only set what differs:
 }
 ```
 
-Set `instance_id` only when you need a fully custom identity (it overrides
-the hostname default). Normally you do not set the identity at all: the
-`pi-slot` launcher helper on the host claims a slot and passes
-`PI_AGENT_MQTT_INSTANCE_SUFFIX=N`, which gives `vm-opencode-N`.
-The default is the sanitized hostname, stable across restarts, so sequential
-sessions reuse one Home Assistant device. MQTT clientIds still get a
-per-process pid suffix so concurrent agents never evict each other from
-the broker.
-
-```json
-{
-  "mqtt": {
-    "slot_count": 4,
-    "will_delay_seconds": 90,
-    "holder": "my-project",
-    "expose": { "holder": true }
-  }
-}
-```
-
-`slot_count` (default 4) sizes the pool. A numeric suffix beyond the pool
-without a full `instance_id` override is a fail-loud overflow: the agent
-logs an error and does not connect MQTT, so a 5th agent never silently
-invents a new device.
-
-`will_delay_seconds` (default 90, MQTT 5 only, 0 disables) holds the LWT
-`offline` back so short sleeps and lid-closes do not flap every slot.
-Graceful shutdown still publishes `offline` immediately.
-
-`holder` (or `PI_AGENT_MQTT_HOLDER`) labels what holds the slot — typically
-the project name, set by the launcher. The device name stays stable
-(`Pi Agent on vm-opencode-1`); the holder shows in its own sensor.
-
-### Slot allocation with `pi-slot` (host side)
-
-Slot allocation happens on the host, never inside the guest VM and never
-over MQTT. The launcher claims a slot on the host filesystem and passes
-the suffix in:
-
-```bash
-# Run a VM with an auto-claimed slot (suffix exported into the VM env)
-bin/pi-slot --holder my-project -- qemu-system-x86_64 ...
-
-# Inspect slots
-bin/pi-slot --list
-
-# Advanced: claim and hold manually (prints N, holds until killed)
-bin/pi-slot --claim
-```
-
-Options: `--slots N` (pool size), `--dir DIR` (lock dir),
-`--on-overflow fail|wait` (block instead of refusing). Locks are host
-processes, so PC sleep never frees them and killing the VM frees its slot.
-The guest only sees `PI_AGENT_MQTT_INSTANCE_SUFFIX`.
-
-### Limitation: single launching PC
-
-This design assumes **one PC launches all agent VMs**. Slot locks live on
-that PC's filesystem and MQTT presence is only a reporting signal, never
-the allocator. Two PCs allocating from the same pool will collide: both
-can claim "slot 1" locally and fight over one Home Assistant device
-(last-writer-wins on state). If you ever add a second launching host,
-give each host its own pool (different `slot_count` ranges are not
-enough — use distinct `instance_id` prefixes per host) or move allocation
-to a shared arbiter.
+Set `instance_id` only when you want a stable persistent Home Assistant device.
+By default the instance id is ephemeral per process (`hostname-pid-random`).
+This avoids MQTT clientId / topic collisions when you run multiple agents that
+share the same `~/.pi` dir. To pin an identity, set `PI_AGENT_MQTT_INSTANCE_ID`
+or `mqtt.instance_id` in settings (e.g. per systemd unit or docker env).
 
 Legacy files `.pi/mqtt.json` and `~/.pi/agent/mqtt.json` still work but are
 deprecated — migrate their contents under the `mqtt` key in `settings.json`.
+
+### Dashboards: show only live agents
+
+Entity ids are per-session, so pinning cards does not work. Use
+[lovelace-auto-entities](https://github.com/thomasloven/lovelace-auto-entities)
+to render whatever is currently alive. Dead sessions are `unavailable`
+(LWT), so excluding them hides everything that is gone:
+
+```yaml
+type: custom:auto-entities
+card:
+  type: entities
+  title: Pi Agents
+filter:
+  include:
+    - entity_id: "sensor.pi_agent_*_status"
+  exclude:
+    - state: unavailable
+show_empty: true
+```
+
+Entity ids follow `sensor.pi_agent_<instance>_status` where `<instance>` is
+the instance id with non-alphanumerics replaced by `_`. A second card on
+`sensor.pi_agent_*_holder` shows what each live session works on.
+
+### Cleanup: delete stale discovery configs
+
+Discovery configs are retained, so finished sessions stay registered (greyed
+out) until their configs are deleted. Graceful exits do not delete them —
+only `/mqtt-clean` from a live session, or an external job, does. Set up a
+recurring cleanup, e.g. a cron job that publishes empty retained payloads to
+`homeassistant/+/+/<node>/*/config` topics whose `availability` has been
+`offline` for N days. Sketch with mosquitto tools:
+
+```bash
+# List discovery configs whose availability topic holds a retained "offline":
+mosquitto_sub -h "$BROKER" -t 'pi-agent/+/availability' --retained-only -v 
+```
+
+Match each stale `pi-agent/<node>/availability` back to its discovery topics
+`<prefix>/{sensor,binary_sensor,button}/<sanitized-node>/*/config` (sanitize
+by replacing `[^a-zA-Z0-9_-]` with `_`) and clear them:
+
+```bash
+mosquitto_pub -h "$BROKER" -t "$CONFIG_TOPIC" -n -r
+```
+
+Until the job runs, stale devices are harmless: `unavailable`, excluded from
+auto-entities lists, and they never trigger `working → idle` automations.
 
 ### Environment Variables
 
@@ -165,12 +195,9 @@ deprecated — migrate their contents under the `mqtt` key in `settings.json`.
 | `PI_AGENT_MQTT_USERNAME` | Username for MQTT authentication |
 | `PI_AGENT_MQTT_PASSWORD` | Password for MQTT authentication |
 | `PI_AGENT_MQTT_PASSWORD_ENV` | Name of environment variable with password |
-| `PI_AGENT_MQTT_INSTANCE_ID` | Full override for the agent instance id |
-| `PI_AGENT_MQTT_INSTANCE_SUFFIX` | Suffix appended to hostname id (e.g. `1`, `2`) |
-| `PI_AGENT_MQTT_HOLDER` | Label of what holds this slot (e.g. project name) |
-| `PI_AGENT_MQTT_SLOT_COUNT` | Pool size for numeric-slot overflow check (default `4`) |
+| `PI_AGENT_MQTT_INSTANCE_ID` | Stable identifier for the agent instance |
+| `PI_AGENT_MQTT_HOLDER` | Label of what this session works on (e.g. project name) |
 | `PI_AGENT_MQTT_WILL_DELAY_SECONDS` | MQTT 5 LWT delay in seconds (default `90`, `0` disables) |
-| `PI_AGENT_MQTT_SLOT_DIR` | Lock dir for `pi-slot` (default `~/.cache/pi-slots`) |
 | `PI_AGENT_MQTT_DEVICE_NAME` | Display name of the Home Assistant device |
 | `PI_AGENT_MQTT_BASE_TOPIC` | Base topic for state and availability |
 | `PI_AGENT_MQTT_DISCOVERY_PREFIX` | Home Assistant discovery prefix |
@@ -202,24 +229,19 @@ mode: single
 
 ### Notify when task completes
 
-Gate on availability: sleep and kills surface as `unavailable`, never as
-`idle`, so closing the lid does not trigger LEDs or sound.
+Gate on availability implicitly: dead sessions go `unavailable`, never
+`idle`, so only a live agent finishing triggers this. Closing the lid does
+not fire your LEDs or sound.
 
 ```yaml
 alias: Pi Agent Finished
 triggers:
   - trigger: state
-    entity_id: sensor.pi_agent_vm_opencode_1_status
+    entity_id: sensor.pi_agent_workstation_pi_status
     from:
       - "working"
       - "tool"
     to: "idle"
-conditions:
-  - condition: not
-    conditions:
-      - condition: state
-        entity_id: sensor.pi_agent_vm_opencode_1_status
-        state: unavailable
 actions:
   - action: notify.notify
     data:
@@ -228,8 +250,5 @@ actions:
 mode: single
 ```
 
-Replace `vm_opencode_1` with your slot entity. Entity ids follow
-`sensor.pi_agent_<instance>_status` where `<instance>` is the instance id
-with non-alphanumerics replaced by `_`. With fixed slots 1-4 you can also
-template across all four status entities for "any agent finished" and
-count running agents.
+With per-session entity ids, prefer an auto-entities card over per-device
+automations when you want "any agent finished" across all live sessions.

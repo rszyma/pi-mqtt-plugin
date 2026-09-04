@@ -17,9 +17,7 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     qos: 1,
     retain_state: true,
     publish_interval_seconds: 30,
-    slot_count: 4,
     will_delay_seconds: 90,
-    slot_overflow: false,
     controls: {
       stop: false,
     },
@@ -151,7 +149,6 @@ describe("Home Assistant MQTT Discovery Builder", () => {
   });
 
   it("builds cleanup messages with empty retained payloads", () => {
-    // holder is covered by cleanup as well
     const holderCleanup = buildCleanupMessages(baseConfig).find((m) =>
       m.topic === "homeassistant/sensor/dev-pi/holder/config",
     );

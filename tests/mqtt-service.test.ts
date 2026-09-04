@@ -68,9 +68,7 @@ describe("MqttService", () => {
     qos: 1,
     retain_state: true,
     publish_interval_seconds: 0,
-    slot_count: 4,
     will_delay_seconds: 90,
-    slot_overflow: false,
     controls: { stop: true },
     expose: {
       session: true,
@@ -127,26 +125,6 @@ describe("MqttService", () => {
       qos: 1,
       retain: true,
     });
-  });
-
-  it("uses a unique per-process clientId so slots never evict each other", () => {
-    let mockClientInstance: MockMqttClient | null = null;
-    const stateManager = new StateManager(config);
-
-    const service = new MqttService({
-      config,
-      stateManager,
-      clientFactory: (url, opts) => {
-        mockClientInstance = new MockMqttClient(url, opts);
-        return mockClientInstance as unknown as MqttClient;
-      },
-    });
-
-    service.start();
-
-    expect(mockClientInstance!.clientOptions.clientId).toBe(
-      `pi-agent-test-node-${process.pid}`,
-    );
   });
 
   it("publishes availability, discovery, and initial state on connect", () => {

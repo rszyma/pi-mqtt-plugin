@@ -1,13 +1,13 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { randomUUID } from "node:crypto";
 import type { MqttPluginConfig } from "./types.js";
 
 const DEFAULT_BROKER = "mqtt://127.0.0.1:1883";
 const DEFAULT_DISCOVERY_PREFIX = "homeassistant";
 const DEFAULT_QOS = 1;
 const DEFAULT_PUBLISH_INTERVAL_SECONDS = 5;
-const DEFAULT_SLOT_COUNT = 4;
 const DEFAULT_WILL_DELAY_SECONDS = 90;
 
 export const SETTINGS_KEY = "mqtt";
@@ -15,53 +15,33 @@ export const SETTINGS_KEY = "mqtt";
 export type MqttSettings = Partial<MqttPluginConfig>;
 
 /**
- * Sanitize an identifier fragment for MQTT topics / HA ids.
- * Allows letters, digits, dash, underscore; anything else becomes "-".
+ * Generate a per-process ephemeral instance ID. No disk persistence.
+ * Stable within a process, unique across concurrent processes sharing the
+ * same ~/.pi dir. Use env var PI_AGENT_MQTT_INSTANCE_ID for a stable
+ * persistent identity (e.g. in systemd units or docker env).
  */
-export function sanitizeInstancePart(input: string): string {
-  const cleaned = input.trim().replace(/[^A-Za-z0-9_-]/g, "-");
-  return cleaned.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
-}
+let cachedEphemeralId: string | null = null;
 
-export function parseSlotNumber(suffix: string | undefined): number | null {
-  if (!suffix) return null;
-  const trimmed = suffix.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-  const n = Number.parseInt(trimmed, 10);
-  return Number.isSafeInteger(n) && n >= 1 ? n : null;
-}
-
-function defaultHostPart(): string {
+function ephemeralId(): string {
+  if (cachedEphemeralId) return cachedEphemeralId;
   const hostname = os.hostname().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "pi";
-  return sanitizeInstancePart(hostname) || "pi";
+  // pid makes concurrent processes unique even in same millisecond;
+  // random suffix guards fork/reuse edge cases.
+  cachedEphemeralId = `${hostname}-${process.pid}-${randomUUID().slice(0, 6)}`;
+  return cachedEphemeralId;
 }
 
-/**
- * Resolve the stable instance ID.
- *
- * Priority:
- * 1. explicitId (PI_AGENT_MQTT_INSTANCE_ID / mqtt.instance_id) — full override.
- * 2. hostname + suffix (PI_AGENT_MQTT_INSTANCE_SUFFIX / mqtt.instance_suffix).
- * 3. hostname alone.
- *
- * The default is stable per host: restarts reuse the same Home Assistant
- * device instead of registering a new one. Pass a suffix (e.g. "1", "2")
- * from the VM launcher when several live VMs share one hostname.
- */
-export function getStableInstanceId(explicitId?: string, suffix?: string): string {
+/** For tests: reset the process-scoped cached id. */
+export function _resetEphemeralIdCache(): void {
+  cachedEphemeralId = null;
+}
+
+export function getStableInstanceId(explicitId?: string): string {
   if (explicitId && explicitId.trim().length > 0) {
     return explicitId.trim();
   }
-  const host = defaultHostPart();
-  const cleanSuffix = suffix ? sanitizeInstancePart(suffix) : "";
-  if (cleanSuffix) {
-    return `${host}-${cleanSuffix}`;
-  }
-  return host;
+  return ephemeralId();
 }
-
-/** Deprecated no-op kept for backwards compatibility (ids are now stable). */
-export function _resetEphemeralIdCache(): void {}
 
 function tryReadJsonFile<T>(filePath: string): T | null {
   try {
@@ -158,9 +138,7 @@ export function sanitizeMqttConfig(input: unknown): Partial<MqttPluginConfig> {
   if (typeof o.password === "string") out.password = o.password;
   if (typeof o.password_env === "string") out.password_env = o.password_env;
   if (typeof o.instance_id === "string") out.instance_id = o.instance_id;
-  if (typeof o.instance_suffix === "string") out.instance_suffix = o.instance_suffix;
   if (typeof o.holder === "string") out.holder = o.holder;
-  if (typeof o.slot_count === "number" && Number.isFinite(o.slot_count)) out.slot_count = o.slot_count;
   if (typeof o.will_delay_seconds === "number" && Number.isFinite(o.will_delay_seconds)) out.will_delay_seconds = o.will_delay_seconds;
   if (typeof o.device_name === "string") out.device_name = o.device_name;
   if (typeof o.base_topic === "string") out.base_topic = o.base_topic;
@@ -205,9 +183,7 @@ export function resolveConfig(
     process.env.MQTT_PASSWORD ||
     (envPasswordEnv && process.env[envPasswordEnv]);
   const envInstanceId = process.env.PI_AGENT_MQTT_INSTANCE_ID;
-  const envInstanceSuffix = process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX;
   const envHolder = process.env.PI_AGENT_MQTT_HOLDER;
-  const envSlotCount = process.env.PI_AGENT_MQTT_SLOT_COUNT;
   const envWillDelay = process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS;
   const envDeviceName = process.env.PI_AGENT_MQTT_DEVICE_NAME;
   const envBaseTopic = process.env.PI_AGENT_MQTT_BASE_TOPIC;
@@ -220,15 +196,6 @@ export function resolveConfig(
     ...sanitizeMqttConfig(customConfig ?? {}),
   };
 
-  const slotCountRaw =
-    envSlotCount !== undefined && envSlotCount !== ""
-      ? Number.parseInt(envSlotCount, 10)
-      : mergedPartial.slot_count;
-  const slotCount =
-    typeof slotCountRaw === "number" && Number.isFinite(slotCountRaw) && slotCountRaw >= 1
-      ? Math.floor(slotCountRaw)
-      : DEFAULT_SLOT_COUNT;
-
   const willDelayRaw =
     envWillDelay !== undefined && envWillDelay !== ""
       ? Number.parseInt(envWillDelay, 10)
@@ -238,17 +205,10 @@ export function resolveConfig(
       ? Math.floor(willDelayRaw)
       : DEFAULT_WILL_DELAY_SECONDS;
 
-  const explicitId = envInstanceId || mergedPartial.instance_id;
-  const suffix = envInstanceSuffix || mergedPartial.instance_suffix;
-  const instanceId = getStableInstanceId(explicitId, suffix);
+  const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id);
 
-  // Fail-loud overflow: a numeric suffix beyond the pool without a full
-  // instance_id override. The caller (session_start) refuses MQTT in this
-  // case so we never silently invent a 5th device.
-  const slotNumber = parseSlotNumber(suffix);
-  const slotOverflow = !explicitId && slotNumber !== null && slotNumber > slotCount;
-
-  const deviceName = envDeviceName || mergedPartial.device_name || `Pi Agent on ${instanceId}`;
+  const hostname = os.hostname() || "host";
+  const deviceName = envDeviceName || mergedPartial.device_name || `Pi Agent on ${hostname}`;
 
   const baseTopic = envBaseTopic || mergedPartial.base_topic || `pi-agent/${instanceId}`;
 
@@ -289,11 +249,8 @@ export function resolveConfig(
     password: resolvedPassword,
     password_env: mergedPartial.password_env || envPasswordEnv,
     instance_id: instanceId,
-    instance_suffix: suffix,
     holder: envHolder || mergedPartial.holder,
-    slot_count: slotCount,
     will_delay_seconds: willDelaySeconds,
-    slot_overflow: slotOverflow,
     device_name: deviceName,
     base_topic: baseTopic,
     discovery_prefix: discoveryPrefix,

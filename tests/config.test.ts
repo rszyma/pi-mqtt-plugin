@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import * as os from "node:os";
-import { getStableInstanceId, resolveConfig, sanitizeInstancePart } from "../src/config.js";
+import { _resetEphemeralIdCache, getStableInstanceId, resolveConfig } from "../src/config.js";
 
 const TEST_AGENT_DIR = "/tmp/nonexistent-pi-home/.pi/agent";
 
@@ -9,8 +8,6 @@ describe("Config resolution", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    // NOTE: resolveConfig's third arg pins the agent dir so tests never read
-    // the developer's real ~/.pi/agent/settings.json.
     delete process.env.PI_AGENT_MQTT_BROKER;
     delete process.env.MQTT_BROKER;
     delete process.env.PI_AGENT_MQTT_USERNAME;
@@ -18,9 +15,7 @@ describe("Config resolution", () => {
     delete process.env.PI_AGENT_MQTT_PASSWORD;
     delete process.env.MQTT_PASSWORD;
     delete process.env.PI_AGENT_MQTT_INSTANCE_ID;
-    delete process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX;
     delete process.env.PI_AGENT_MQTT_HOLDER;
-    delete process.env.PI_AGENT_MQTT_SLOT_COUNT;
     delete process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS;
     delete process.env.PI_AGENT_MQTT_DEVICE_NAME;
     delete process.env.PI_AGENT_MQTT_BASE_TOPIC;
@@ -31,6 +26,7 @@ describe("Config resolution", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    _resetEphemeralIdCache();
   });
 
   it("resolves default configuration", () => {
@@ -40,9 +36,7 @@ describe("Config resolution", () => {
     expect(config.qos).toBe(1);
     expect(config.retain_state).toBe(true);
     expect(config.publish_interval_seconds).toBe(5);
-    expect(config.slot_count).toBe(4);
     expect(config.will_delay_seconds).toBe(90);
-    expect(config.slot_overflow).toBe(false);
     expect(config.holder).toBeUndefined();
     expect(config.controls.stop).toBe(false);
     expect(config.expose.session).toBe(true);
@@ -86,70 +80,24 @@ describe("Config resolution", () => {
     expect(id).toBe("my-explicit-node");
   });
 
-  it("defaults to the sanitized hostname (stable across restarts)", () => {
-    const expected = sanitizeInstancePart(os.hostname().toLowerCase()) || "pi";
-    expect(getStableInstanceId()).toBe(expected);
-    const a = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    const b = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(a.instance_id).toBe(expected);
-    expect(a.instance_id).toBe(b.instance_id);
-    expect(a.base_topic).toBe(`pi-agent/${expected}`);
+  it("generates unique ephemeral ids per process by default", () => {
+    const a = getStableInstanceId();
+    _resetEphemeralIdCache();
+    const b = getStableInstanceId();
+    expect(a).not.toBe(b);
   });
 
-  it("appends instance suffix to the hostname by default", () => {
-    const host = sanitizeInstancePart(os.hostname().toLowerCase()) || "pi";
-    expect(getStableInstanceId(undefined, "2")).toBe(`${host}-2`);
-    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "3";
-    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(config.instance_id).toBe(`${host}-3`);
-    expect(config.base_topic).toBe(`pi-agent/${host}-3`);
-  });
-
-  it("prefers full instance_id override over suffix", () => {
-    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "2";
-    process.env.PI_AGENT_MQTT_INSTANCE_ID = "vm-opencode-2";
-    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(config.instance_id).toBe("vm-opencode-2");
-  });
-
-  it("sanitizes suffix characters", () => {
-    expect(sanitizeInstancePart("vm 2!")).toBe("vm-2");
-    const host = sanitizeInstancePart(os.hostname().toLowerCase()) || "pi";
-    expect(getStableInstanceId(undefined, "vm 2!")).toBe(`${host}-vm-2`);
-  });
-
-  it("resolves slot_count, will_delay and holder from env", () => {
-    process.env.PI_AGENT_MQTT_SLOT_COUNT = "6";
+  it("resolves will_delay and holder from env", () => {
     process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS = "30";
     process.env.PI_AGENT_MQTT_HOLDER = "myproj";
     const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(config.slot_count).toBe(6);
     expect(config.will_delay_seconds).toBe(30);
     expect(config.holder).toBe("myproj");
   });
 
-  it("falls back to defaults on invalid slot_count / will_delay", () => {
-    process.env.PI_AGENT_MQTT_SLOT_COUNT = "banana";
+  it("falls back to default will_delay on invalid input", () => {
     process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS = "-5";
     const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(config.slot_count).toBe(4);
     expect(config.will_delay_seconds).toBe(90);
-  });
-
-  it("flags slot overflow for numeric suffix beyond slot_count", () => {
-    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "5";
-    const overflow = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(overflow.slot_overflow).toBe(true);
-    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "2";
-    const ok = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(ok.slot_overflow).toBe(false);
-  });
-
-  it("does not flag overflow when instance_id fully overrides", () => {
-    process.env.PI_AGENT_MQTT_INSTANCE_SUFFIX = "9";
-    process.env.PI_AGENT_MQTT_INSTANCE_ID = "custom-node";
-    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
-    expect(config.slot_overflow).toBe(false);
-    expect(config.instance_id).toBe("custom-node");
   });
 });
