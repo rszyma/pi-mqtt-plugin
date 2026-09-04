@@ -94,15 +94,16 @@ Environment variables override file settings.
 Add an `mqtt` key to `~/.pi/agent/settings.json` (global) or `.pi/settings.json` (project).
 Project settings override global settings — same pattern as `pi-ding`.
 
-Global example (`~/.pi/agent/settings.json`) — values shown are the defaults,
-so unset keys fall back to these:
+Global example (`~/.pi/agent/settings.json`) — uncommented values are the
+defaults; commented lines show common non-default overrides:
 
 ```json
 {
   "mqtt": {
-    "broker": "mqtt://192.168.1.50:1883",
-    "password_env": "PI_AGENT_MQTT_PASSWORD",
-    "device_name": "Pi Agent on Workstation",
+    // "broker": "mqtt://192.168.1.50:1883", // default: mqtt://127.0.0.1:1883
+    // "username": "pi-agent", // default: unset (anonymous)
+    // "password_env": "PI_AGENT_MQTT_PASSWORD", // default: unset
+    // "device_name": "Pi Agent on Workstation", // default: Pi Agent on <hostname>
     "discovery_prefix": "homeassistant",
     "qos": 1,
     "retain_state": true,
