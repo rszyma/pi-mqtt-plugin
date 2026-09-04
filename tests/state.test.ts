@@ -101,11 +101,11 @@ describe("StateManager", () => {
     expect(payload.input_tokens).toBeUndefined();
   });
 
-  it("exposes holder in state payload defaulting to unknown", () => {
+  it("exposes project in state payload defaulting to unknown", () => {
     const manager = new StateManager(config);
-    expect(manager.buildFilteredStatePayload().holder).toBe("unknown");
-    manager.setHolder("myproj");
-    expect(manager.buildFilteredStatePayload().holder).toBe("myproj");
+    expect(manager.buildFilteredStatePayload().project).toBe("unknown");
+    manager.setProject("myproj");
+    expect(manager.buildFilteredStatePayload().project).toBe("myproj");
   });
 
   it("does not leak prompt text, responses, or tool arguments in payload", () => {

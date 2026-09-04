@@ -13,7 +13,7 @@ export interface MqttControlsConfig {
 export interface MqttExposeConfig {
   session?: boolean;
   model?: boolean;
-  holder?: boolean;
+  project?: boolean;
   tool?: boolean;
   token_usage?: boolean;
   errors?: boolean;
@@ -26,8 +26,8 @@ export interface MqttPluginConfig {
   password?: string;
   password_env?: string;
   instance_id: string;
-  /** Human-readable label of what this session works on (e.g. project name). */
-  holder?: string;
+  /** Human-readable label of what this session works on (defaults to working directory name). */
+  project?: string;
   /** MQTT 5 will-delay in seconds; LWT "offline" is held back this long. 0 disables. */
   will_delay_seconds: number;
   device_name: string;
@@ -45,7 +45,7 @@ export interface AgentStateData {
   busy: boolean;
   session?: string | null;
   model?: string | null;
-  holder?: string | null;
+  project?: string | null;
   tool?: string | null;
   last_activity: string;
   turn_count: number;

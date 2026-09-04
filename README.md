@@ -45,7 +45,7 @@ pi install .
     // "password_env": "PI_AGENT_MQTT_PASSWORD", // default: unset
     // "device_name": "Pi Agent on Workstation", // default: Pi Agent on <hostname>
     // "instance_id": "stable-id", // default: hostname-boot-pid-random (ephemeral)
-    // "holder": "my-project", // default: basename of working directory
+    // "project": "my-project", // default: basename of working directory
     "discovery_prefix": "homeassistant",
     "qos": 1,
     "retain_state": true,
@@ -55,7 +55,7 @@ pi install .
     "expose": {
       "session": true,
       "model": true,
-      "holder": true,
+      "project": true,
       "tool": true,
       "token_usage": true,
       "errors": true,
@@ -67,12 +67,12 @@ pi install .
 
 `will_delay_seconds` (MQTT 5 only, `0` disables) holds the LWT `offline`
 back so short sleeps do not flap sessions to `unavailable`. Graceful
-shutdown still publishes `offline` immediately. `holder` labels what the
+shutdown still publishes `offline` immediately. `project` labels what the
 session works on; dynamic lists can render it without parsing device names.
 
 Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 `PI_AGENT_MQTT_PASSWORD` (or `PI_AGENT_MQTT_PASSWORD_ENV` naming the var),
-`PI_AGENT_MQTT_INSTANCE_ID`, `PI_AGENT_MQTT_HOLDER`,
+`PI_AGENT_MQTT_INSTANCE_ID`, `PI_AGENT_MQTT_PROJECT`,
 `PI_AGENT_MQTT_WILL_DELAY_SECONDS`, `PI_AGENT_MQTT_DEVICE_NAME`,
 `PI_AGENT_MQTT_BASE_TOPIC` (`pi-agent/<instance_id>`),
 `PI_AGENT_MQTT_DISCOVERY_PREFIX`, `PI_AGENT_MQTT_ENABLE_STOP=true`.
@@ -85,7 +85,7 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 | Busy | Binary Sensor | On while the agent runs a task |
 | Session | Sensor | Active session id |
 | Model | Sensor | Active model id |
-| Holder | Sensor | Project label, `unknown` when holder is empty |
+| Project | Sensor | Working directory name, `unknown` when empty |
 | Last Activity | Sensor | Timestamp of latest state change |
 | Stop | Button | Only when `controls.stop` is on |
 
@@ -115,7 +115,7 @@ show_empty: true
 ```
 
 Ids follow `sensor.pi_agent_<instance>_status` (`<instance>` sanitized).
-A second card on `sensor.pi_agent_*_holder` shows what each session works on.
+A second card on `sensor.pi_agent_*_project` shows what each session works on.
 
 ## Cleanup
 

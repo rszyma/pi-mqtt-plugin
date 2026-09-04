@@ -126,13 +126,13 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     });
   }
 
-  // 5. Holder Sensor (what this session works on; "unknown" when unset).
-  if (config.expose.holder !== false) {
-    const holderPayload: HomeAssistantSensorDiscovery = {
-      name: "Holder",
-      unique_id: `pi_agent_${uniquePrefix}_holder`,
+  // 5. Project Sensor (what this session works on; "unknown" when unset).
+  if (config.expose.project !== false) {
+    const projectPayload: HomeAssistantSensorDiscovery = {
+      name: "Project",
+      unique_id: `pi_agent_${uniquePrefix}_project`,
       state_topic: stateTopic,
-      value_template: "{{ value_json.holder | default('unknown') }}",
+      value_template: "{{ value_json.project | default('unknown') }}",
       availability_topic: availabilityTopic,
       payload_available: "online",
       payload_not_available: "offline",
@@ -141,8 +141,8 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
       device,
     };
     messages.push({
-      topic: `${config.discovery_prefix}/sensor/${nodeId}/holder/config`,
-      payload: JSON.stringify(holderPayload),
+      topic: `${config.discovery_prefix}/sensor/${nodeId}/project/config`,
+      payload: JSON.stringify(projectPayload),
       retain: true,
       qos: config.qos,
     });
@@ -199,7 +199,7 @@ export function buildCleanupMessages(config: MqttPluginConfig): DiscoveryMessage
     { component: "binary_sensor", name: "busy" },
     { component: "sensor", name: "session" },
     { component: "sensor", name: "model" },
-    { component: "sensor", name: "holder" },
+    { component: "sensor", name: "project" },
     { component: "sensor", name: "last_activity" },
     { component: "button", name: "stop" },
   ];

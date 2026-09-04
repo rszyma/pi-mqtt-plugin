@@ -11,7 +11,7 @@ export class StateManager {
       busy: false,
       session: null,
       model: null,
-      holder: null,
+      project: null,
       tool: null,
       last_activity: new Date().toISOString(),
       turn_count: 0,
@@ -65,8 +65,8 @@ export class StateManager {
     this.state.last_activity = new Date().toISOString();
   }
 
-  public setHolder(holder: string | null): void {
-    this.state.holder = holder;
+  public setProject(project: string | null): void {
+    this.state.project = project;
     this.state.last_activity = new Date().toISOString();
   }
 
@@ -108,8 +108,8 @@ export class StateManager {
       payload.model = this.state.model ?? "none";
     }
 
-    if (this.config.expose.holder !== false) {
-      payload.holder = this.state.holder ?? "unknown";
+    if (this.config.expose.project !== false) {
+      payload.project = this.state.project ?? "unknown";
     }
 
     if (this.config.expose.tool !== false) {

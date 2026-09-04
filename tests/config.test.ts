@@ -16,7 +16,7 @@ describe("Config resolution", () => {
     delete process.env.PI_AGENT_MQTT_PASSWORD;
     delete process.env.MQTT_PASSWORD;
     delete process.env.PI_AGENT_MQTT_INSTANCE_ID;
-    delete process.env.PI_AGENT_MQTT_HOLDER;
+    delete process.env.PI_AGENT_MQTT_PROJECT;
     delete process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS;
     delete process.env.PI_AGENT_MQTT_DEVICE_NAME;
     delete process.env.PI_AGENT_MQTT_BASE_TOPIC;
@@ -38,7 +38,7 @@ describe("Config resolution", () => {
     expect(config.retain_state).toBe(true);
     expect(config.publish_interval_seconds).toBe(5);
     expect(config.will_delay_seconds).toBe(90);
-    expect(config.holder).toBe("nonexistent");
+    expect(config.project).toBe("nonexistent");
     expect(config.device_name).toBe(`Pi Agent [nonexistent] (${os.hostname() || "host"})`);
     expect(config.controls.stop).toBe(false);
     expect(config.expose.session).toBe(true);
@@ -90,12 +90,12 @@ describe("Config resolution", () => {
     expect(a.split("-").length).toBeGreaterThanOrEqual(4);
   });
 
-  it("resolves will_delay and holder from env", () => {
+  it("resolves will_delay and project from env", () => {
     process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS = "30";
-    process.env.PI_AGENT_MQTT_HOLDER = "myproj";
+    process.env.PI_AGENT_MQTT_PROJECT = "myproj";
     const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR);
     expect(config.will_delay_seconds).toBe(30);
-    expect(config.holder).toBe("myproj");
+    expect(config.project).toBe("myproj");
   });
 
   it("falls back to default will_delay on invalid input", () => {

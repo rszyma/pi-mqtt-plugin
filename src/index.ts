@@ -56,8 +56,8 @@ export default function homeAssistantMqttExtension(
       stateManager.setModel(`${ctx.model.provider}/${ctx.model.id}`);
     }
 
-    if (config.holder) {
-      stateManager.setHolder(config.holder);
+    if (config.project) {
+      stateManager.setProject(config.project);
     }
 
     stateManager.setStatus("idle");
@@ -174,7 +174,7 @@ export default function homeAssistantMqttExtension(
         `Connected: ${connected ? "Yes" : "No"}`,
         `Name: ${config.device_name}`,
         `Instance ID: ${config.instance_id} (ephemeral per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
-        `Holder: ${config.holder ?? "unknown"}`,
+        `Project: ${config.project ?? "unknown"}`,
         `Base Topic: ${config.base_topic}`,
         `Discovery Prefix: ${config.discovery_prefix}`,
         `Settings: global ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,

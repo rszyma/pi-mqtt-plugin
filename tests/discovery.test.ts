@@ -128,31 +128,31 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     expect(messages.find((m) => m.topic.includes("/model/"))).toBeUndefined();
   });
 
-  it("includes holder sensor when exposed", () => {
+  it("includes project sensor when exposed", () => {
     const messages = buildDiscoveryMessages(baseConfig);
-    const holderMsg = messages.find((m) =>
-      m.topic === "homeassistant/sensor/dev-pi/holder/config",
+    const projectMsg = messages.find((m) =>
+      m.topic === "homeassistant/sensor/dev-pi/project/config",
     );
-    expect(holderMsg).toBeDefined();
-    const holderPayload = JSON.parse(holderMsg!.payload);
-    expect(holderPayload.unique_id).toBe("pi_agent_dev_pi_holder");
-    expect(holderPayload.value_template).toBe("{{ value_json.holder | default('unknown') }}");
+    expect(projectMsg).toBeDefined();
+    const projectPayload = JSON.parse(projectMsg!.payload);
+    expect(projectPayload.unique_id).toBe("pi_agent_dev_pi_project");
+    expect(projectPayload.value_template).toBe("{{ value_json.project | default('unknown') }}");
   });
 
-  it("omits holder sensor when disabled in expose config", () => {
-    const noHolder: MqttPluginConfig = {
+  it("omits project sensor when disabled in expose config", () => {
+    const noProject: MqttPluginConfig = {
       ...baseConfig,
-      expose: { ...baseConfig.expose, holder: false },
+      expose: { ...baseConfig.expose, project: false },
     };
-    const messages = buildDiscoveryMessages(noHolder);
-    expect(messages.find((m) => m.topic.includes("/holder/"))).toBeUndefined();
+    const messages = buildDiscoveryMessages(noProject);
+    expect(messages.find((m) => m.topic.includes("/project/"))).toBeUndefined();
   });
 
   it("builds cleanup messages with empty retained payloads", () => {
-    const holderCleanup = buildCleanupMessages(baseConfig).find((m) =>
-      m.topic === "homeassistant/sensor/dev-pi/holder/config",
+    const projectCleanup = buildCleanupMessages(baseConfig).find((m) =>
+      m.topic === "homeassistant/sensor/dev-pi/project/config",
     );
-    expect(holderCleanup).toBeDefined();
+    expect(projectCleanup).toBeDefined();
     const cleanup = buildCleanupMessages(baseConfig);
     expect(cleanup.length).toBeGreaterThan(0);
     for (const msg of cleanup) {

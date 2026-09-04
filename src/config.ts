@@ -126,7 +126,7 @@ export function sanitizeMqttConfig(input: unknown): Partial<MqttPluginConfig> {
   if (typeof o.password === "string") out.password = o.password;
   if (typeof o.password_env === "string") out.password_env = o.password_env;
   if (typeof o.instance_id === "string") out.instance_id = o.instance_id;
-  if (typeof o.holder === "string") out.holder = o.holder;
+  if (typeof o.project === "string") out.project = o.project;
   if (typeof o.will_delay_seconds === "number" && Number.isFinite(o.will_delay_seconds)) out.will_delay_seconds = o.will_delay_seconds;
   if (typeof o.device_name === "string") out.device_name = o.device_name;
   if (typeof o.base_topic === "string") out.base_topic = o.base_topic;
@@ -144,7 +144,7 @@ export function sanitizeMqttConfig(input: unknown): Partial<MqttPluginConfig> {
     out.expose = {};
     if (typeof e.session === "boolean") out.expose.session = e.session;
     if (typeof e.model === "boolean") out.expose.model = e.model;
-    if (typeof e.holder === "boolean") out.expose.holder = e.holder;
+    if (typeof e.project === "boolean") out.expose.project = e.project;
     if (typeof e.tool === "boolean") out.expose.tool = e.tool;
     if (typeof e.token_usage === "boolean") out.expose.token_usage = e.token_usage;
     if (typeof e.errors === "boolean") out.expose.errors = e.errors;
@@ -171,7 +171,7 @@ export function resolveConfig(
     process.env.MQTT_PASSWORD ||
     (envPasswordEnv && process.env[envPasswordEnv]);
   const envInstanceId = process.env.PI_AGENT_MQTT_INSTANCE_ID;
-  const envHolder = process.env.PI_AGENT_MQTT_HOLDER;
+  const envProject = process.env.PI_AGENT_MQTT_PROJECT;
   const envWillDelay = process.env.PI_AGENT_MQTT_WILL_DELAY_SECONDS;
   const envDeviceName = process.env.PI_AGENT_MQTT_DEVICE_NAME;
   const envBaseTopic = process.env.PI_AGENT_MQTT_BASE_TOPIC;
@@ -196,12 +196,12 @@ export function resolveConfig(
   const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id);
 
   const hostname = os.hostname() || "host";
-  const holderDefault = path.basename(cwd) || undefined;
-  const holder = envHolder || mergedPartial.holder || holderDefault;
+  const projectDefault = path.basename(cwd) || undefined;
+  const project = envProject || mergedPartial.project || projectDefault;
   const deviceName =
     envDeviceName ||
     mergedPartial.device_name ||
-    (holder ? `Pi Agent [${holder}] (${hostname})` : `Pi Agent (${hostname})`);
+    (project ? `Pi Agent [${project}] (${hostname})` : `Pi Agent (${hostname})`);
 
   const baseTopic = envBaseTopic || mergedPartial.base_topic || `pi-agent/${instanceId}`;
 
@@ -229,7 +229,7 @@ export function resolveConfig(
   const expose = {
     session: mergedPartial.expose?.session ?? true,
     model: mergedPartial.expose?.model ?? true,
-    holder: mergedPartial.expose?.holder ?? true,
+    project: mergedPartial.expose?.project ?? true,
     tool: mergedPartial.expose?.tool ?? true,
     token_usage: mergedPartial.expose?.token_usage ?? true,
     errors: mergedPartial.expose?.errors ?? true,
@@ -242,7 +242,7 @@ export function resolveConfig(
     password: resolvedPassword,
     password_env: mergedPartial.password_env || envPasswordEnv,
     instance_id: instanceId,
-    holder,
+    project,
     will_delay_seconds: willDelaySeconds,
     device_name: deviceName,
     base_topic: baseTopic,
