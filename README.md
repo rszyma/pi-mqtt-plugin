@@ -111,10 +111,13 @@ Global example (`~/.pi/agent/settings.json`):
     "expose": {
       "session": true,
       "model": true,
+      "holder": true,
       "tool": true,
       "token_usage": true,
-      "errors": true
-    }
+      "errors": true,
+      "context_percent": true
+    },
+    "will_delay_seconds": 90
   }
 }
 ```
@@ -137,6 +140,33 @@ or `mqtt.instance_id` in settings (e.g. per systemd unit or docker env).
 
 Legacy files `.pi/mqtt.json` and `~/.pi/agent/mqtt.json` still work but are
 deprecated — migrate their contents under the `mqtt` key in `settings.json`.
+
+### Defaults
+
+Every key is optional. Unset keys fall back to these defaults:
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `broker` | `mqtt://127.0.0.1:1883` | |
+| `username` / `password` | unset | Anonymous access |
+| `password_env` | unset | Name of env var holding the password |
+| `instance_id` | `hostname-pid-random` | Ephemeral per process; set to pin a stable device |
+| `holder` | unset | Label for the Holder sensor; reads `free` when unset |
+| `device_name` | `Pi Agent on <hostname>` | |
+| `base_topic` | `pi-agent/<instance_id>` | |
+| `discovery_prefix` | `homeassistant` | |
+| `qos` | `1` | |
+| `retain_state` | `true` | |
+| `publish_interval_seconds` | `5` | `0` disables periodic republish |
+| `will_delay_seconds` | `90` | MQTT 5 only; `0` disables |
+| `controls.stop` | `false` | |
+| `expose.session` | `true` | |
+| `expose.model` | `true` | |
+| `expose.holder` | `true` | |
+| `expose.tool` | `true` | |
+| `expose.token_usage` | `true` | |
+| `expose.errors` | `true` | |
+| `expose.context_percent` | `true` | |
 
 ### Dashboards: show only live agents
 
