@@ -101,7 +101,6 @@ so unset keys fall back to these:
 {
   "mqtt": {
     "broker": "mqtt://192.168.1.50:1883",
-    "username": "pi-agent",
     "password_env": "PI_AGENT_MQTT_PASSWORD",
     "device_name": "Pi Agent on Workstation",
     "discovery_prefix": "homeassistant",
