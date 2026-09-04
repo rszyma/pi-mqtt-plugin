@@ -160,6 +160,32 @@ Replace the entity id with a live one (`/mqtt-status` shows the instance
 id). For "any agent finished" across sessions, prefer the auto-entities card
 above over per-device automations.
 
+## Labels
+
+MQTT discovery cannot set labels, but an automation can tag each new device.
+Needs [Spook](https://spook.boo) (HACS) for the label action. Create a
+"Pi Agent" label in Settings → Labels first:
+
+```yaml
+alias: Label new Pi Agent devices
+triggers:
+  - trigger: event
+    event_type: device_registry_updated
+    event_data:
+      action: create
+conditions:
+  - condition: template
+    value_template: >
+      {{ 'pi-agent:' in (trigger.event.data.device_id
+         | device_attr('identifiers') | join(',')) }}
+actions:
+  - action: homeassistant.add_label_to_device
+    data:
+      device_id: "{{ trigger.event.data.device_id }}"
+      label_id: "{{ label_id('Pi Agent') }}"
+mode: parallel
+```
+
 ## Development
 
 ```bash
