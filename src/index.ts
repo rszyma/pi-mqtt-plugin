@@ -1,26 +1,11 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { loadMqttSettings, resolveConfig, sanitizeMqttConfig } from "./config.js";
+import { loadMqttSettings, resolveConfig } from "./config.js";
 import { MqttService } from "./mqtt-service.js";
 import { StateManager } from "./state.js";
 import type { MqttPluginConfig } from "./types.js";
-
-function readJsonFile(filePath: string): Record<string, unknown> | null {
-  try {
-    if (!fs.existsSync(filePath)) return {};
-    return JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function writeJsonFile(filePath: string, data: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf8");
-}
 
 export default function homeAssistantMqttExtension(
   pi: ExtensionAPI,
@@ -263,7 +248,7 @@ export default function homeAssistantMqttExtension(
   }
 
   pi.registerCommand("mqtt", {
-    description: "Home Assistant MQTT (usage: /mqtt [status|reload|edit [project|global]|clean])",
+    description: "Home Assistant MQTT (usage: /mqtt [status|reload|clean])",
     handler: async (args, ctx) => {
       const tokens = (args || "").trim().split(/\s+/).filter(Boolean);
       const sub = (tokens[0] || "status").toLowerCase();
@@ -280,7 +265,6 @@ export default function homeAssistantMqttExtension(
 
       if (sub === "reload") {
         const { loadError } = loadSettings(ctx);
-        // Re-resolve without restart? Inform user they should /reload for full reconnect.
         ctx.ui.notify(
           loadError
             ? `Reloaded settings (with error: ${loadError}) — run /reload to reconnect MQTT`
@@ -290,35 +274,7 @@ export default function homeAssistantMqttExtension(
         return;
       }
 
-      if (sub === "edit") {
-        const scope = (tokens[1] || "").toLowerCase();
-        const target: "project" | "global" = scope === "global" ? "global" : "project";
-        const settingsPath =
-          target === "project" ? projectSettingsPath! : globalSettingsPath!;
-
-        const parsed = readJsonFile(settingsPath);
-        if (parsed === null) {
-          ctx.ui.notify(`Invalid JSON in ${settingsPath}`, "error");
-          return;
-        }
-        const root = parsed as Record<string, unknown>;
-        const existing = sanitizeMqttConfig(root["mqtt"]);
-        const prefill = JSON.stringify(existing, null, 2) + "\n";
-        const edited = await ctx.ui.editor(`Edit mqtt config (${target})`, prefill);
-        if (edited === undefined) return;
-        try {
-          const next = sanitizeMqttConfig(JSON.parse(edited));
-          const nextRoot = { ...root, mqtt: next };
-          writeJsonFile(settingsPath, nextRoot);
-          ctx.ui.notify(`Saved mqtt config to ${settingsPath} — run /reload to apply`, "info");
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          ctx.ui.notify(`Invalid JSON: ${msg}`, "error");
-        }
-        return;
-      }
-
-      ctx.ui.notify(`Unknown subcommand "${sub}". Usage: /mqtt [status|reload|edit [project|global]|clean]`, "warning");
+      ctx.ui.notify(`Unknown subcommand "${sub}". Usage: /mqtt [status|reload|clean]`, "warning");
     },
   });
 }
