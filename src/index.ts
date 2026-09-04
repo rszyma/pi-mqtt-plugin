@@ -127,14 +127,34 @@ export default function homeAssistantMqttExtension(
     }
   });
 
-  pi.on("turn_end", async (event) => {
-    if (stateManager && event.message && "usage" in event.message) {
+  pi.on("turn_end", async (event, ctx) => {
+    if (!stateManager) return;
+    if (event.message && "usage" in event.message) {
       const usage = (event.message as { usage?: { input?: number; output?: number } }).usage;
       if (usage) {
         stateManager.updateTokens(usage.input, usage.output);
       }
-      mqttService?.publishState();
     }
+    // Same total as the footer: sum usage.cost.total over session entries.
+    try {
+      let total = 0;
+      for (const entry of ctx.sessionManager.getEntries()) {
+        const e = entry as {
+          type?: string;
+          message?: { role?: string; usage?: { cost?: { total?: number } } };
+          usage?: { cost?: { total?: number } };
+        };
+        if (e.type === "message" && (e.message?.role === "assistant" || e.message?.role === "toolResult")) {
+          const cost = e.message?.usage?.cost?.total;
+          if (typeof cost === "number") total += cost;
+        } else if ((e.type === "branch_summary" || e.type === "compaction") && e.usage) {
+          const cost = e.usage?.cost?.total;
+          if (typeof cost === "number") total += cost;
+        }
+      }
+      stateManager.setCostUsd(total);
+    } catch { /* entries unreadable: keep last known cost */ }
+    mqttService?.publishState();
   });
 
   pi.on("agent_settled", async () => {

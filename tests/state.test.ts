@@ -101,6 +101,13 @@ describe("StateManager", () => {
     expect(payload.input_tokens).toBeUndefined();
   });
 
+  it("exposes cost in state payload defaulting to 0", () => {
+    const manager = new StateManager(config);
+    expect(manager.buildFilteredStatePayload().cost_usd).toBe(0);
+    manager.setCostUsd(0.0123);
+    expect(manager.buildFilteredStatePayload().cost_usd).toBe(0.0123);
+  });
+
   it("exposes project in state payload defaulting to unknown", () => {
     const manager = new StateManager(config);
     expect(manager.buildFilteredStatePayload().project).toBe("unknown");

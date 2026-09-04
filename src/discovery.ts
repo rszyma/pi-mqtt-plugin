@@ -151,7 +151,33 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     });
   }
 
-  // 6. Last Activity Sensor
+  // 6. Cost Sensor (session total, same number as the footer; diagnostic).
+  if (config.expose.cost !== false) {
+    const costPayload: HomeAssistantSensorDiscovery = {
+      name: "Cost",
+      unique_id: `pi_agent_${uniquePrefix}_cost`,
+      state_topic: stateTopic,
+      value_template: "{{ value_json.cost_usd | default(0) }}",
+      availability_topic: availabilityTopic,
+      payload_available: "online",
+      payload_not_available: "offline",
+      device_class: "monetary",
+      unit_of_measurement: "$",
+      suggested_display_precision: 4,
+      icon: "mdi:cash-multiple",
+      expire_after: expireAfter,
+      entity_category: "diagnostic",
+      device,
+    };
+    messages.push({
+      topic: `${config.discovery_prefix}/sensor/${nodeId}/cost/config`,
+      payload: JSON.stringify(costPayload),
+      retain: true,
+      qos: config.qos,
+    });
+  }
+
+  // 7. Last Activity Sensor
   const lastActivityPayload: HomeAssistantSensorDiscovery = {
     name: "Last Activity",
     unique_id: `pi_agent_${uniquePrefix}_last_activity`,
@@ -172,7 +198,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     qos: config.qos,
   });
 
-  // 7. Stop Button (if enabled)
+  // 8. Stop Button (if enabled)
   if (config.controls.stop) {
     const stopPayload: HomeAssistantButtonDiscovery = {
       name: "Stop",
@@ -204,6 +230,7 @@ export function buildCleanupMessages(config: MqttPluginConfig): DiscoveryMessage
     { component: "sensor", name: "session" },
     { component: "sensor", name: "model" },
     { component: "sensor", name: "project" },
+    { component: "sensor", name: "cost" },
     { component: "sensor", name: "last_activity" },
     { component: "button", name: "stop" },
   ];

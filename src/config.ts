@@ -145,6 +145,7 @@ export function sanitizeMqttConfig(input: unknown): Partial<MqttPluginConfig> {
     if (typeof e.session === "boolean") out.expose.session = e.session;
     if (typeof e.model === "boolean") out.expose.model = e.model;
     if (typeof e.project === "boolean") out.expose.project = e.project;
+    if (typeof e.cost === "boolean") out.expose.cost = e.cost;
     if (typeof e.tool === "boolean") out.expose.tool = e.tool;
     if (typeof e.token_usage === "boolean") out.expose.token_usage = e.token_usage;
     if (typeof e.errors === "boolean") out.expose.errors = e.errors;
@@ -230,6 +231,7 @@ export function resolveConfig(
     session: mergedPartial.expose?.session ?? true,
     model: mergedPartial.expose?.model ?? true,
     project: mergedPartial.expose?.project ?? true,
+    cost: mergedPartial.expose?.cost ?? true,
     tool: mergedPartial.expose?.tool ?? true,
     token_usage: mergedPartial.expose?.token_usage ?? true,
     errors: mergedPartial.expose?.errors ?? true,

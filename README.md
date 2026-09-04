@@ -56,6 +56,7 @@ pi install .
       "session": true,
       "model": true,
       "project": true,
+      "cost": true,
       "tool": true,
       "token_usage": true,
       "errors": true,
@@ -86,6 +87,7 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 | Session | Sensor | Active session id |
 | Model | Sensor | Active model id |
 | Project | Sensor | Working directory name, `unknown` when empty |
+| Cost | Sensor | Session total $, same number as the footer |
 | Last Activity | Sensor | Timestamp of latest state change |
 | Stop | Button | Only when `controls.stop` is on |
 

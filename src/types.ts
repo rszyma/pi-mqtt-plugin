@@ -14,6 +14,7 @@ export interface MqttExposeConfig {
   session?: boolean;
   model?: boolean;
   project?: boolean;
+  cost?: boolean;
   tool?: boolean;
   token_usage?: boolean;
   errors?: boolean;
@@ -46,6 +47,7 @@ export interface AgentStateData {
   session?: string | null;
   model?: string | null;
   project?: string | null;
+  cost_usd?: number | null;
   tool?: string | null;
   last_activity: string;
   turn_count: number;
@@ -73,6 +75,7 @@ export interface HomeAssistantSensorDiscovery {
   payload_not_available: string;
   device_class?: string;
   unit_of_measurement?: string;
+  suggested_display_precision?: number;
   state_class?: string;
   icon?: string;
   expire_after?: number;

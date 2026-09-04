@@ -139,6 +139,18 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     expect(JSON.parse(statusMsg!.payload).entity_category).toBeUndefined();
   });
 
+  it("includes cost sensor as diagnostic monetary", () => {
+    const messages = buildDiscoveryMessages(baseConfig);
+    const costMsg = messages.find((m) =>
+      m.topic === "homeassistant/sensor/dev-pi/cost/config",
+    );
+    expect(costMsg).toBeDefined();
+    const costPayload = JSON.parse(costMsg!.payload);
+    expect(costPayload.unique_id).toBe("pi_agent_dev_pi_cost");
+    expect(costPayload.device_class).toBe("monetary");
+    expect(costPayload.entity_category).toBe("diagnostic");
+  });
+
   it("includes project sensor when exposed", () => {
     const messages = buildDiscoveryMessages(baseConfig);
     const projectMsg = messages.find((m) =>
