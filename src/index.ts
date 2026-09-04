@@ -226,13 +226,6 @@ export default function homeAssistantMqttExtension(
     }
   });
 
-  pi.registerCommand("mqtt-clean", {
-    description: "Remove Home Assistant MQTT discovery entities for this agent",
-    handler: async (_args, _ctx) => {
-      await cleanDiscovery(_ctx);
-    },
-  });
-
   async function cleanDiscovery(ctx: ExtensionContext): Promise<void> {
     if (!mqttService) {
       ctx.ui.notify("MQTT service is not running", "warning");
