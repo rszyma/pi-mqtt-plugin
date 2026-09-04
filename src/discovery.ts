@@ -163,7 +163,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
       payload_not_available: "offline",
       device_class: "monetary",
       unit_of_measurement: "$",
-      suggested_display_precision: 4,
+      suggested_display_precision: 3,
       icon: "mdi:cash-multiple",
       expire_after: expireAfter,
       entity_category: "diagnostic",
