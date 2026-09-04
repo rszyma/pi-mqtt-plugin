@@ -226,70 +226,62 @@ export default function homeAssistantMqttExtension(
     }
   });
 
-  pi.registerCommand("mqtt-status", {
-    description: "Show Home Assistant MQTT integration status",
-    handler: async (_args, ctx) => {
-      if (!config || !mqttService || !stateManager) {
-        ctx.ui.notify("MQTT integration is not initialized", "warning");
-        return;
-      }
-
-      const connected = mqttService.getConnected();
-      const rawState = stateManager.getRawState();
-      const statusText = [
-        `Broker: ${config.broker}`,
-        `Connected: ${connected ? "Yes" : "No"}`,
-        `Name: ${config.device_name}`,
-        `Instance ID: ${config.instance_id} (one per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
-        `Project: ${config.project ?? "unknown"}`,
-        `Base Topic: ${config.base_topic}`,
-        `Discovery Prefix: ${config.discovery_prefix}`,
-        `Settings: global ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,
-        ...(lastLoadError ? [`Settings error: ${lastLoadError}`] : []),
-        `Current Status: ${rawState.status}`,
-        `Active Session: ${rawState.session ?? "none"}`,
-        `Active Model: ${rawState.model ?? "none"}`,
-      ].join("\n");
-
-      ctx.ui.notify(statusText, connected ? "info" : "warning");
-    },
-  });
-
   pi.registerCommand("mqtt-clean", {
     description: "Remove Home Assistant MQTT discovery entities for this agent",
-    handler: async (_args, ctx) => {
-      if (!mqttService) {
-        ctx.ui.notify("MQTT service is not running", "warning");
-        return;
-      }
-
-      await mqttService.cleanDiscovery();
-      ctx.ui.notify("Cleaned MQTT discovery topics in Home Assistant", "info");
+    handler: async (_args, _ctx) => {
+      await cleanDiscovery(_ctx);
     },
   });
 
+  async function cleanDiscovery(ctx: ExtensionContext): Promise<void> {
+    if (!mqttService) {
+      ctx.ui.notify("MQTT service is not running", "warning");
+      return;
+    }
+
+    await mqttService.cleanDiscovery();
+    ctx.ui.notify("Cleaned MQTT discovery topics in Home Assistant", "info");
+  }
+
+  function showStatus(ctx: ExtensionContext): void {
+    if (!config || !mqttService || !stateManager) {
+      ctx.ui.notify("MQTT integration is not initialized", "warning");
+      return;
+    }
+
+    const connected = mqttService.getConnected();
+    const rawState = stateManager.getRawState();
+    const statusText = [
+      `MQTT: ${connected ? "connected" : "disconnected"}`,
+      `Broker: ${config.broker}`,
+      `Name: ${config.device_name}`,
+      `Instance ID: ${config.instance_id} (one per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
+      `Project: ${config.project ?? "unknown"}`,
+      `Base Topic: ${config.base_topic}`,
+      `Discovery Prefix: ${config.discovery_prefix}`,
+      `Global settings: ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,
+      ...(lastLoadError ? [`Settings error: ${lastLoadError}`] : []),
+      `Current Status: ${rawState.status}`,
+      `Active Session: ${rawState.session ?? "none"}`,
+      `Active Model: ${rawState.model ?? "none"}`,
+    ].join("\n");
+
+    ctx.ui.notify(statusText, connected ? "info" : "warning");
+  }
+
   pi.registerCommand("mqtt", {
-    description: "Configure Home Assistant MQTT (usage: /mqtt [info|reload|edit [project|global]])",
+    description: "Home Assistant MQTT (usage: /mqtt [status|reload|edit [project|global]|clean])",
     handler: async (args, ctx) => {
       const tokens = (args || "").trim().split(/\s+/).filter(Boolean);
-      const sub = (tokens[0] || "info").toLowerCase();
+      const sub = (tokens[0] || "status").toLowerCase();
 
-      if (sub === "info") {
-        const status = mqttService?.getConnected() ? "connected" : "disconnected";
-        const lines = [
-          `MQTT: ${status}`,
-          `Broker: ${config?.broker ?? "(not loaded yet)"}`,
-          `Instance: ${config?.instance_id ?? "?"}`,
-          `Base topic: ${config?.base_topic ?? "?"}`,
-          `Global settings: ${globalSettingsPath ?? "?"}`,
-          `Project settings: ${projectSettingsPath ?? "?"}`,
-          ...(lastLoadError ? [`Error: ${lastLoadError}`] : []),
-          ``,
-          `Config lives under the "mqtt" key in settings.json:`,
-          `  { "mqtt": { "broker": "mqtt://...", "instance_id": "..." } }`,
-          `Project settings override global. Env vars override both.`,
-        ];
-        ctx.ui.notify(lines.join("\n"), "info");
+      if (sub === "status" || sub === "info") {
+        showStatus(ctx);
+        return;
+      }
+
+      if (sub === "clean") {
+        await cleanDiscovery(ctx);
         return;
       }
 
@@ -333,7 +325,7 @@ export default function homeAssistantMqttExtension(
         return;
       }
 
-      ctx.ui.notify(`Unknown subcommand "${sub}". Usage: /mqtt [info|reload|edit [project|global]]`, "warning");
+      ctx.ui.notify(`Unknown subcommand "${sub}". Usage: /mqtt [status|reload|edit [project|global]|clean]`, "warning");
     },
   });
 }

@@ -93,9 +93,10 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 
 ## Commands
 
-- `/mqtt` — info / reload / edit settings (`/mqtt edit` or `/mqtt edit global`)
-- `/mqtt-status` — connection state and metrics
-- `/mqtt-clean` — delete this session's discovery entities
+- `/mqtt` — status (also `/mqtt status`; `/mqtt info` kept as alias)
+- `/mqtt reload` — re-read settings (`/reload` still needed to reconnect)
+- `/mqtt edit [project|global]` — edit settings in `$EDITOR`
+- `/mqtt clean` — delete this session's discovery entities
 
 ## Dashboards
 
