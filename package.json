@@ -20,6 +20,7 @@
     "dist",
     "bin",
     "README.md",
+    "docs",
     "LICENSE*"
   ],
   "scripts": {
