@@ -55,7 +55,6 @@ pi install .
     "will_delay_seconds": 90,
     "controls": { "stop": false },
     "expose": {
-      "session": true,
       "model": true,
       "project": true,
       "cost": true,
@@ -84,9 +83,8 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 
 | Entity | Type | Notes |
 | --- | --- | --- |
-| Status | Sensor | `idle`, `working`, `tool`, `waiting`, `error`, `stopping`, `compacting` |
+| Status | Sensor | `idle`, `working`, `tool`, `waiting`, `error`, `stopping`, `compacting` (+ `session` attribute) |
 | Busy | Binary Sensor | On while the agent runs a task |
-| Session | Sensor | Active session id |
 | Model | Sensor | Active model id |
 | Project | Sensor | Working directory name, `unknown` when empty |
 | Cost | Sensor | Session total $, same number as the footer |

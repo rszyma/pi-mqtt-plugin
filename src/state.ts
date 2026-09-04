@@ -106,9 +106,9 @@ export class StateManager {
       turn_count: this.state.turn_count,
     };
 
-    if (this.config.expose.session !== false) {
-      payload.session = this.state.session ?? "none";
-    }
+    // Session id is always present: one device is one session, and the
+    // Status sensor exposes it as an attribute.
+    payload.session = this.state.session ?? "none";
 
     if (this.config.expose.model !== false) {
       payload.model = this.state.model ?? "none";

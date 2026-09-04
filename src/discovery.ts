@@ -40,12 +40,15 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
   // short sleeps do not flap entities.
   const expireAfter = Math.max(config.publish_interval_seconds * 3, config.will_delay_seconds + 120);
 
-  // 1. Status Sensor
+  // 1. Status Sensor. Session id rides as an attribute: one device is one
+  // session, so it needs no entity of its own.
   const statusPayload: HomeAssistantSensorDiscovery = {
     name: "Status",
     unique_id: `pi_agent_${uniquePrefix}_status`,
     state_topic: stateTopic,
     value_template: "{{ value_json.status }}",
+    json_attributes_topic: stateTopic,
+    json_attributes_template: "{{ {'session': value_json.session} | tojson }}",
     availability_topic: availabilityTopic,
     payload_available: "online",
     payload_not_available: "offline",
@@ -82,30 +85,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     qos: config.qos,
   });
 
-  // 3. Session Sensor (if enabled)
-  if (config.expose.session !== false) {
-    const sessionPayload: HomeAssistantSensorDiscovery = {
-      name: "Session",
-      unique_id: `pi_agent_${uniquePrefix}_session`,
-      state_topic: stateTopic,
-      value_template: "{{ value_json.session | default('none') }}",
-      availability_topic: availabilityTopic,
-      payload_available: "online",
-      payload_not_available: "offline",
-      icon: "mdi:message-processing",
-      expire_after: expireAfter,
-      entity_category: "diagnostic",
-      device,
-    };
-    messages.push({
-      topic: `${config.discovery_prefix}/sensor/${nodeId}/session/config`,
-      payload: JSON.stringify(sessionPayload),
-      retain: true,
-      qos: config.qos,
-    });
-  }
-
-  // 4. Model Sensor (if enabled)
+  // 3. Model Sensor (if enabled)
   if (config.expose.model !== false) {
     const modelPayload: HomeAssistantSensorDiscovery = {
       name: "Model",
@@ -128,7 +108,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     });
   }
 
-  // 5. Project Sensor (what this session works on; "unknown" when unset).
+  // 4. Project Sensor (what this session works on; "unknown" when unset).
   if (config.expose.project !== false) {
     const projectPayload: HomeAssistantSensorDiscovery = {
       name: "Project",
@@ -151,7 +131,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     });
   }
 
-  // 6. Cost Sensor (session total, same number as the footer; diagnostic).
+  // 5. Cost Sensor (session total, same number as the footer; diagnostic).
   if (config.expose.cost !== false) {
     const costPayload: HomeAssistantSensorDiscovery = {
       name: "Cost",
@@ -177,7 +157,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     });
   }
 
-  // 7. Last Activity Sensor
+  // 6. Last Activity Sensor
   const lastActivityPayload: HomeAssistantSensorDiscovery = {
     name: "Last Activity",
     unique_id: `pi_agent_${uniquePrefix}_last_activity`,
@@ -198,7 +178,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     qos: config.qos,
   });
 
-  // 8. Stop Button (if enabled)
+  // 7. Stop Button (if enabled)
   if (config.controls.stop) {
     const stopPayload: HomeAssistantButtonDiscovery = {
       name: "Stop",
@@ -227,7 +207,6 @@ export function buildCleanupMessages(config: MqttPluginConfig): DiscoveryMessage
   const entities = [
     { component: "sensor", name: "status" },
     { component: "binary_sensor", name: "busy" },
-    { component: "sensor", name: "session" },
     { component: "sensor", name: "model" },
     { component: "sensor", name: "project" },
     { component: "sensor", name: "cost" },

@@ -12,7 +12,6 @@ export interface MqttControlsConfig {
 }
 
 export interface MqttExposeConfig {
-  session?: boolean;
   model?: boolean;
   project?: boolean;
   cost?: boolean;
@@ -73,6 +72,8 @@ export interface HomeAssistantSensorDiscovery {
   unique_id: string;
   state_topic: string;
   value_template: string;
+  json_attributes_topic?: string;
+  json_attributes_template?: string;
   availability_topic: string;
   payload_available: string;
   payload_not_available: string;

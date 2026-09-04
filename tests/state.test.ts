@@ -15,7 +15,6 @@ describe("StateManager", () => {
     will_delay_seconds: 90,
     controls: { stop: false },
     expose: {
-      session: true,
       model: true,
       tool: true,
       token_usage: true,
@@ -78,7 +77,6 @@ describe("StateManager", () => {
     const customConfig: MqttPluginConfig = {
       ...config,
       expose: {
-        session: false,
         model: false,
         tool: false,
         token_usage: false,
@@ -95,7 +93,7 @@ describe("StateManager", () => {
     const payload = manager.buildFilteredStatePayload();
     expect(payload.status).toBe("tool");
     expect(payload.busy).toBe(true);
-    expect(payload.session).toBeUndefined();
+    expect(payload.session).toBe("test-session");
     expect(payload.model).toBeUndefined();
     expect(payload.tool).toBeUndefined();
     expect(payload.input_tokens).toBeUndefined();

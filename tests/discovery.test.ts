@@ -22,7 +22,6 @@ describe("Home Assistant MQTT Discovery Builder", () => {
       stop: false,
     },
     expose: {
-      session: true,
       model: true,
       tool: true,
       token_usage: true,
@@ -76,7 +75,10 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     const sessionMsg = messages.find((m) =>
       m.topic === "homeassistant/sensor/dev-pi/session/config",
     );
-    expect(sessionMsg).toBeDefined();
+    expect(sessionMsg).toBeUndefined();
+
+    expect(statusPayload.json_attributes_topic).toBe("pi-agent/dev-pi/state");
+    expect(statusPayload.json_attributes_template).toContain("session");
 
     const modelMsg = messages.find((m) =>
       m.topic === "homeassistant/sensor/dev-pi/model/config",
@@ -114,23 +116,21 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     expect(stopPayload.payload_press).toBe(JSON.stringify({ command: "stop" }));
   });
 
-  it("omits session and model when disabled in expose config", () => {
+  it("omits model when disabled in expose config", () => {
     const minConfig: MqttPluginConfig = {
       ...baseConfig,
       expose: {
-        session: false,
         model: false,
       },
     };
 
     const messages = buildDiscoveryMessages(minConfig);
-    expect(messages.find((m) => m.topic.includes("/session/"))).toBeUndefined();
     expect(messages.find((m) => m.topic.includes("/model/"))).toBeUndefined();
   });
 
-  it("marks session, model, project and last_activity as diagnostic", () => {
+  it("marks model, project and last_activity as diagnostic", () => {
     const messages = buildDiscoveryMessages(baseConfig);
-    for (const name of ["session", "model", "project", "last_activity"]) {
+    for (const name of ["model", "project", "last_activity"]) {
       const msg = messages.find((m) => m.topic.endsWith(`/${name}/config`));
       expect(msg).toBeDefined();
       expect(JSON.parse(msg!.payload).entity_category).toBe("diagnostic");

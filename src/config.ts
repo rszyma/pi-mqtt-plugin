@@ -162,7 +162,6 @@ export function sanitizeMqttConfig(input: unknown): Partial<MqttPluginConfig> {
   if (o.expose && typeof o.expose === "object") {
     const e = o.expose as Record<string, unknown>;
     out.expose = {};
-    if (typeof e.session === "boolean") out.expose.session = e.session;
     if (typeof e.model === "boolean") out.expose.model = e.model;
     if (typeof e.project === "boolean") out.expose.project = e.project;
     if (typeof e.cost === "boolean") out.expose.cost = e.cost;
@@ -252,7 +251,6 @@ export function resolveConfig(
   };
 
   const expose = {
-    session: mergedPartial.expose?.session ?? true,
     model: mergedPartial.expose?.model ?? true,
     project: mergedPartial.expose?.project ?? true,
     cost: mergedPartial.expose?.cost ?? true,

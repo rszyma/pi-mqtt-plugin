@@ -41,7 +41,6 @@ describe("Config resolution", () => {
     expect(config.project).toBe("nonexistent");
     expect(config.device_name).toBe(`Pi Agent [nonexistent] (${os.hostname() || "host"})`);
     expect(config.controls.stop).toBe(false);
-    expect(config.expose.session).toBe(true);
     expect(config.expose.model).toBe(true);
     expect(config.expose.tool).toBe(true);
     expect(config.expose.token_usage).toBe(true);
