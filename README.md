@@ -140,6 +140,9 @@ dashboard above, and never triggering `working → idle` automations.
 
 ## Automations
 
+Add via Settings → Automations & scenes → Create automation → ⋮ (top
+right) → Edit in YAML → paste → Save.
+
 Dead sessions go `unavailable`, never `idle`, so completion automations only
 fire for live agents. Closing the lid triggers nothing.
 
