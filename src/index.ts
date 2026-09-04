@@ -211,70 +211,58 @@ export default function homeAssistantMqttExtension(
     }
   });
 
-  async function cleanDiscovery(ctx: ExtensionContext): Promise<void> {
-    if (!mqttService) {
-      ctx.ui.notify("MQTT service is not running", "warning");
-      return;
-    }
-
-    await mqttService.cleanDiscovery();
-    ctx.ui.notify("Cleaned MQTT discovery topics in Home Assistant", "info");
-  }
-
-  function showStatus(ctx: ExtensionContext): void {
-    if (!config || !mqttService || !stateManager) {
-      ctx.ui.notify("MQTT integration is not initialized", "warning");
-      return;
-    }
-
-    const connected = mqttService.getConnected();
-    const rawState = stateManager.getRawState();
-    const statusText = [
-      `MQTT: ${connected ? "connected" : "disconnected"}`,
-      `Broker: ${config.broker}`,
-      `Name: ${config.device_name}`,
-      `Instance ID: ${config.instance_id} (one per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
-      `Project: ${config.project ?? "unknown"} (mqtt.project or PI_AGENT_MQTT_PROJECT overrides it)`,
-      `Base Topic: ${config.base_topic}`,
-      `Discovery Prefix: ${config.discovery_prefix}`,
-      `Global settings: ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,
-      ...(lastLoadError ? [`Settings error: ${lastLoadError}`] : []),
-      `Current Status: ${rawState.status}`,
-      `Active Session: ${rawState.session ?? "none"}`,
-      `Active Model: ${rawState.model ?? "none"}`,
-    ].join("\n");
-
-    ctx.ui.notify(statusText, connected ? "info" : "warning");
-  }
-
-  pi.registerCommand("mqtt", {
-    description: "Home Assistant MQTT (usage: /mqtt [status|reload|clean])",
-    handler: async (args, ctx) => {
-      const tokens = (args || "").trim().split(/\s+/).filter(Boolean);
-      const sub = (tokens[0] || "status").toLowerCase();
-
-      if (sub === "status" || sub === "info") {
-        showStatus(ctx);
+  pi.registerCommand("mqtt-status", {
+    description: "Show Home Assistant MQTT integration status",
+    handler: async (_args, ctx) => {
+      if (!config || !mqttService || !stateManager) {
+        ctx.ui.notify("MQTT integration is not initialized", "warning");
         return;
       }
 
-      if (sub === "clean") {
-        await cleanDiscovery(ctx);
+      const connected = mqttService.getConnected();
+      const rawState = stateManager.getRawState();
+      const statusText = [
+        `MQTT: ${connected ? "connected" : "disconnected"}`,
+        `Broker: ${config.broker}`,
+        `Name: ${config.device_name}`,
+        `Instance ID: ${config.instance_id} (one per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
+        `Project: ${config.project ?? "unknown"} (mqtt.project or PI_AGENT_MQTT_PROJECT overrides it)`,
+        `Base Topic: ${config.base_topic}`,
+        `Discovery Prefix: ${config.discovery_prefix}`,
+        `Global settings: ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,
+        ...(lastLoadError ? [`Settings error: ${lastLoadError}`] : []),
+        `Current Status: ${rawState.status}`,
+        `Active Session: ${rawState.session ?? "none"}`,
+        `Active Model: ${rawState.model ?? "none"}`,
+      ].join("\n");
+
+      ctx.ui.notify(statusText, connected ? "info" : "warning");
+    },
+  });
+
+  pi.registerCommand("mqtt-clean", {
+    description: "Remove Home Assistant MQTT discovery entities for this agent",
+    handler: async (_args, ctx) => {
+      if (!mqttService) {
+        ctx.ui.notify("MQTT service is not running", "warning");
         return;
       }
 
-      if (sub === "reload") {
-        const { loadError } = loadSettings(ctx);
-        ctx.ui.notify(
-          loadError
-            ? `Reloaded settings (with error: ${loadError}) — run /reload to reconnect MQTT`
-            : "Reloaded MQTT settings — run /reload to reconnect with new config",
-          loadError ? "warning" : "info",
-        );
-        return;
-      }
+      await mqttService.cleanDiscovery();
+      ctx.ui.notify("Cleaned MQTT discovery topics in Home Assistant", "info");
+    },
+  });
 
-      ctx.ui.notify(`Unknown subcommand "${sub}". Usage: /mqtt [status|reload|clean]`, "warning");
+  pi.registerCommand("mqtt-reload", {
+    description: "Re-read MQTT settings (run /reload to reconnect)",
+    handler: async (_args, ctx) => {
+      const { loadError } = loadSettings(ctx);
+      ctx.ui.notify(
+        loadError
+          ? `Reloaded settings (with error: ${loadError}) — run /reload to reconnect MQTT`
+          : "Reloaded MQTT settings — run /reload to reconnect with new config",
+        loadError ? "warning" : "info",
+      );
     },
   });
 }

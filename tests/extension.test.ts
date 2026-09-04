@@ -36,6 +36,8 @@ describe("Pi Extension Lifecycle", () => {
     expect(mockPi.on).toHaveBeenCalledWith("session_compact_failed", expect.any(Function));
     expect(mockPi.on).toHaveBeenCalledWith("session_shutdown", expect.any(Function));
 
-    expect(commands["mqtt"]).toBeDefined();
+    expect(commands["mqtt-status"]).toBeDefined();
+    expect(commands["mqtt-clean"]).toBeDefined();
+    expect(commands["mqtt-reload"]).toBeDefined();
   });
 });
