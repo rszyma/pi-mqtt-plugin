@@ -1,7 +1,11 @@
 import mqtt, { type MqttClient, type IClientOptions } from "mqtt";
-import { buildCleanupMessages, buildCleanupMessagesForInstance, buildDiscoveryMessages } from "./discovery.js";
+import { buildCleanupMessagesForInstance, buildDiscoveryMessages, sanitizeNodeId } from "./discovery.js";
 import { StateManager } from "./state.js";
 import type { IncomingCommandPayload, MqttPluginConfig } from "./types.js";
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 export type CommandHandler = (command: string) => Promise<void> | void;
 
@@ -185,15 +189,15 @@ export class MqttService {
     });
   }
 
-  public pruneDiscovery(instanceIds: string[]): Promise<number> {
+  public pruneDiscovery(dead: Array<{ instanceId: string }>): Promise<number> {
     return new Promise((resolve) => {
       if (!this.client || !this.isConnected) {
         resolve(0);
         return;
       }
 
-      const messages = instanceIds.flatMap((id) =>
-        buildCleanupMessagesForInstance(this.config, id),
+      const messages = dead.flatMap((d) =>
+        buildCleanupMessagesForInstance(this.config, d.instanceId),
       );
       let remaining = messages.length;
       if (remaining === 0) {
@@ -209,7 +213,7 @@ export class MqttService {
           () => {
             remaining -= 1;
             if (remaining <= 0) {
-              resolve(instanceIds.length);
+              resolve(dead.length);
             }
           },
         );
@@ -218,30 +222,68 @@ export class MqttService {
   }
 
   /**
-   * Find dead sessions: subscribe to pi-agent/+/availability, collect the
-   * instance ids whose retained payload is "offline", then unsubscribe.
-   * Only matches sessions on the default base topic pattern.
+   * Find dead sessions: subscribe to the discovery prefix, parse retained
+   * status configs, then check each device's own availability topic.
    */
-  public findDeadSessions(waitMs = 2000): Promise<string[]> {
+  public findDeadSessions(waitMs = 2000): Promise<Array<{ instanceId: string; availabilityTopic: string }>> {
     return new Promise((resolve) => {
       if (!this.client || !this.isConnected) {
         resolve([]);
         return;
       }
 
-      const dead = new Set<string>();
-      const scanTopic = "pi-agent/+/availability";
+      // status config -> capture node id; configs carry the topics.
+      const statusRe = new RegExp(
+        `^${escapeRegExp(this.config.discovery_prefix)}/sensor/([^/]+)/status/config$`,
+      );
+      const candidates = new Map<string, string>();
+      const scanTopic = `${this.config.discovery_prefix}/sensor/+/status/config`;
       const onMessage = (topic: string, payload: Buffer) => {
-        const match = /^pi-agent\/([^/]+)\/availability$/.exec(topic);
-        if (!match) return;
-        if (payload.toString("utf8") !== "offline") return;
-        if (match[1] === this.config.instance_id) return;
-        dead.add(match[1]);
+        const statusMatch = statusRe.exec(topic);
+        if (statusMatch) {
+          try {
+            const parsed = JSON.parse(payload.toString("utf8")) as {
+              availability_topic?: string;
+              device?: { identifiers?: unknown };
+            };
+            const availabilityTopic = parsed.availability_topic;
+            if (typeof availabilityTopic !== "string" || availabilityTopic.length === 0) return;
+            // Only our devices: identifier "pi-agent:<instance>".
+            const ids = parsed.device?.identifiers;
+            const ours = Array.isArray(ids) && ids.some((id) => typeof id === "string" && id.startsWith("pi-agent:"));
+            if (!ours) return;
+            candidates.set(availabilityTopic, statusMatch[1]);
+            this.client?.subscribe(availabilityTopic, { qos: 1 });
+          } catch { /* ignore malformed retained configs */ }
+          return;
+        }
+        // Availability probe response.
+        const nodeId = candidates.get(topic);
+        if (nodeId === undefined) return;
+        if (payload.toString("utf8") !== "offline") {
+          candidates.delete(topic);
+        }
       };
 
       const done = () => {
         this.client?.removeListener("message", onMessage);
-        this.client?.unsubscribe(scanTopic, () => resolve([...dead]));
+        const topics = [scanTopic, ...candidates.keys()];
+        const dead = [...candidates.entries()].map(([availabilityTopic, nodeId]) => ({
+          instanceId: nodeId,
+          availabilityTopic,
+        }));
+        const filtered = dead.filter((d) => d.instanceId !== sanitizeNodeId(this.config.instance_id));
+        let pending = topics.length;
+        if (pending === 0) {
+          resolve(filtered);
+          return;
+        }
+        for (const t of topics) {
+          this.client?.unsubscribe(t, () => {
+            pending -= 1;
+            if (pending <= 0) resolve(filtered);
+          });
+        }
       };
 
       this.client.on("message", onMessage);

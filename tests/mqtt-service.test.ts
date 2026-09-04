@@ -247,7 +247,7 @@ describe("MqttService", () => {
     service.start();
     mockClientInstance!.emit("connect");
 
-    await service.pruneDiscovery(["some-dead-session"]);
+    await service.pruneDiscovery([{ instanceId: "some-dead-session" }]);
 
     const cleanMessages = mockClientInstance!.publishedMessages.filter(
       (m) => m.message === "" && m.opts.retain === true,
@@ -258,7 +258,7 @@ describe("MqttService", () => {
     ).toBe(true);
   });
 
-  it("finds dead sessions from retained offline availability", async () => {
+  it("finds dead sessions via discovery configs regardless of base topic", async () => {
     let mockClientInstance: MockMqttClient | null = null;
     const stateManager = new StateManager(config);
 
@@ -274,22 +274,51 @@ describe("MqttService", () => {
     service.start();
     mockClientInstance!.emit("connect");
 
-    const found = service.findDeadSessions(10);
+    const found = service.findDeadSessions(20);
+    // Retained status configs arrive first; each carries its availability topic.
     mockClientInstance!.emit(
       "message",
-      "pi-agent/dead-node/availability",
+      "homeassistant/sensor/dead_node/status/config",
+      Buffer.from(
+        JSON.stringify({
+          availability_topic: "custom/dead-node/availability",
+          device: { identifiers: ["pi-agent:dead-node"] },
+        }),
+      ),
+    );
+    mockClientInstance!.emit(
+      "message",
+      "homeassistant/sensor/live_node/status/config",
+      Buffer.from(
+        JSON.stringify({
+          availability_topic: "custom/live-node/availability",
+          device: { identifiers: ["pi-agent:live-node"] },
+        }),
+      ),
+    );
+    mockClientInstance!.emit(
+      "message",
+      "homeassistant/sensor/other/status/config",
+      Buffer.from(
+        JSON.stringify({
+          availability_topic: "other/availability",
+          device: { identifiers: ["not-ours:other"] },
+        }),
+      ),
+    );
+    // Availability probe responses.
+    mockClientInstance!.emit(
+      "message",
+      "custom/dead-node/availability",
       Buffer.from("offline"),
     );
     mockClientInstance!.emit(
       "message",
-      "pi-agent/live-node/availability",
+      "custom/live-node/availability",
       Buffer.from("online"),
     );
-    mockClientInstance!.emit(
-      "message",
-      "pi-agent/test-node/availability",
-      Buffer.from("offline"),
-    );
-    await expect(found).resolves.toEqual(["dead-node"]);
+    await expect(found).resolves.toEqual([
+      { instanceId: "dead_node", availabilityTopic: "custom/dead-node/availability" },
+    ]);
   });
 });

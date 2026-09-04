@@ -256,7 +256,7 @@ export default function homeAssistantMqttExtension(
       }
 
       const pruned = await mqttService.pruneDiscovery(dead);
-      ctx.ui.notify(`Pruned ${pruned} dead session(s): ${dead.join(", ")}`, "info");
+      ctx.ui.notify(`Pruned ${pruned} dead session(s): ${dead.map((d) => d.instanceId).join(", ")}`, "info");
     },
   });
 

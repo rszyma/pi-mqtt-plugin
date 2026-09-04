@@ -122,10 +122,9 @@ A second card on `sensor.pi_agent_*_project` shows what each session works on.
 ## Cleanup
 
 Finished sessions stay registered until their retained discovery configs are
-deleted. Run `/mqtt-prune` from any live session: it scans retained
-`pi-agent/+/availability` topics for `offline` and clears the matching
-discovery configs. Only sessions on the default `pi-agent/<id>` base topic
-are found; custom `base_topic` setups need the manual variant below.
+deleted. Run `/mqtt-prune` from any live session: it reads retained status
+discovery configs, checks each device's own availability topic, and clears
+the configs of the dead ones.
 For automation instead, run a recurring job: find `pi-agent/<node>/availability` topics holding retained
 `offline`, map each back to
 `<prefix>/{sensor,binary_sensor,button}/<sanitized-node>/*/config`
