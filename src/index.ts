@@ -179,7 +179,6 @@ export default function homeAssistantMqttExtension(
         `Name: ${config.device_name}`,
         `Instance ID: ${config.instance_id} (ephemeral per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
         `Holder: ${config.holder ?? "unknown"}`,
-        `Will delay: ${config.will_delay_seconds}s`,
         `Base Topic: ${config.base_topic}`,
         `Discovery Prefix: ${config.discovery_prefix}`,
         `Settings: global ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,
