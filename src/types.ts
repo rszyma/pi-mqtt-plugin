@@ -4,7 +4,8 @@ export type AgentStatus =
   | "tool"
   | "waiting"
   | "error"
-  | "stopping";
+  | "stopping"
+  | "compacting";
 
 export interface MqttControlsConfig {
   stop?: boolean;
@@ -27,6 +28,8 @@ export interface MqttPluginConfig {
   password?: string;
   password_env?: string;
   instance_id: string;
+  /** Explicit id from config/env; undefined when derived from the session id. */
+  explicit_instance_id?: string;
   /** Human-readable label of what this session works on (defaults to working directory name). */
   project?: string;
   /** MQTT 5 will-delay in seconds; LWT "offline" is held back this long. 0 disables. */

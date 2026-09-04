@@ -2,6 +2,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { loadMqttSettings, resolveConfig, sanitizeMqttConfig } from "./config.js";
 import { MqttService } from "./mqtt-service.js";
 import { StateManager } from "./state.js";
@@ -42,15 +43,23 @@ export default function homeAssistantMqttExtension(
     return { loadError };
   }
 
-  pi.on("session_start", async (_event, ctx) => {
+  async function startSessionDevice(ctx: ExtensionContext): Promise<void> {
+    const sessionId = ctx.sessionManager.getSessionId();
+    // Session switches arrive as session_start with reason new/resume/fork.
+    // Retire the previous session's device first so it reads unavailable
+    // instead of freezing green on its last state.
+    if (mqttService) {
+      await mqttService.shutdown();
+      mqttService = null;
+    }
     const { loadError } = loadSettings(ctx);
     if (loadError && ctx.hasUI) {
       ctx.ui.notify(lastLoadError!, "warning");
     }
-    config = resolveConfig(ctx.cwd, customConfig);
+    config = resolveConfig(ctx.cwd, customConfig, undefined, sessionId);
     stateManager = new StateManager(config);
 
-    stateManager.setSession(ctx.sessionManager.getSessionId());
+    stateManager.setSession(sessionId);
 
     if (ctx.model) {
       stateManager.setModel(`${ctx.model.provider}/${ctx.model.id}`);
@@ -75,6 +84,10 @@ export default function homeAssistantMqttExtension(
     });
 
     mqttService.start();
+  }
+
+  pi.on("session_start", async (_event, ctx) => {
+    await startSessionDevice(ctx);
   });
 
   pi.on("session_info_changed", async (event) => {
@@ -165,6 +178,27 @@ export default function homeAssistantMqttExtension(
     }
   });
 
+  pi.on("session_before_compact", async () => {
+    if (stateManager) {
+      stateManager.setStatus("compacting");
+      mqttService?.publishState();
+    }
+  });
+
+  pi.on("session_compact", async () => {
+    if (stateManager) {
+      stateManager.setStatus("idle");
+      mqttService?.publishState();
+    }
+  });
+
+  pi.on("session_compact_failed", async () => {
+    if (stateManager) {
+      stateManager.setStatus("idle");
+      mqttService?.publishState();
+    }
+  });
+
   pi.on("model_select", async (event) => {
     if (stateManager && event.model) {
       stateManager.setModel(`${event.model.provider}/${event.model.id}`);
@@ -172,10 +206,15 @@ export default function homeAssistantMqttExtension(
     }
   });
 
-  pi.on("session_shutdown", async () => {
-    if (mqttService) {
-      await mqttService.shutdown();
-      mqttService = null;
+  pi.on("session_shutdown", async (event) => {
+    // Replacement (new/resume/fork) is handled at the next session_start,
+    // which retires this device before adopting the new one. Only tear down
+    // here on real exit/reload.
+    if (event.reason === "quit" || event.reason === "reload") {
+      if (mqttService) {
+        await mqttService.shutdown();
+        mqttService = null;
+      }
     }
   });
 
@@ -193,7 +232,7 @@ export default function homeAssistantMqttExtension(
         `Broker: ${config.broker}`,
         `Connected: ${connected ? "Yes" : "No"}`,
         `Name: ${config.device_name}`,
-        `Instance ID: ${config.instance_id} (ephemeral per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
+        `Instance ID: ${config.instance_id} (one per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
         `Project: ${config.project ?? "unknown"}`,
         `Base Topic: ${config.base_topic}`,
         `Discovery Prefix: ${config.discovery_prefix}`,

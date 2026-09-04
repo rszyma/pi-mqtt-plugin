@@ -77,6 +77,20 @@ describe("Config resolution", () => {
     expect(config.password).toBe("resolved-secret");
   });
 
+  it("derives instance id from session when no explicit id", () => {
+    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR, "sess-abc-123");
+    expect(config.instance_id).toBe("sess-abc-123");
+    expect(config.explicit_instance_id).toBeUndefined();
+    expect(config.base_topic).toBe("pi-agent/sess-abc-123");
+  });
+
+  it("prefers explicit id over session id", () => {
+    process.env.PI_AGENT_MQTT_INSTANCE_ID = "pinned";
+    const config = resolveConfig("/tmp/nonexistent", undefined, TEST_AGENT_DIR, "sess-abc-123");
+    expect(config.instance_id).toBe("pinned");
+    expect(config.explicit_instance_id).toBe("pinned");
+  });
+
   it("generates stable instance id when explicit is provided", () => {
     const id = getStableInstanceId("my-explicit-node");
     expect(id).toBe("my-explicit-node");

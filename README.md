@@ -6,13 +6,15 @@ No custom Home Assistant code is required.
 ## How it works
 
 Each agent session registers its own Home Assistant device. The instance id
-is ephemeral per process (`hostname-boot-pid-random`), so concurrent agents — on
-one machine or many — never share topics or clientIds. Dead sessions report
-`offline` via Last Will and Testament and show as `unavailable`.
+is the pi session id, so concurrent agents never share topics or clientIds,
+`/new` and forks mint fresh devices, and resumes reclaim the same device
+(retained discovery configs still apply). Dead sessions report `offline` via
+Last Will and Testament and show as `unavailable`.
 
 Set `mqtt.instance_id` (or `PI_AGENT_MQTT_INSTANCE_ID`) for a stable device
 instead, e.g. one long-lived host. Only one agent may own an id at a time
-(last-writer-wins on state).
+(last-writer-wins on state). Without it the id falls back to an ephemeral
+per-process id (`hostname-boot-pid-random`) before a session exists.
 
 Because discovery configs are retained, finished sessions stay registered
 (greyed out) until deleted. Show only live agents with
@@ -44,7 +46,7 @@ pi install .
     // "username": "pi-agent", // default: unset (anonymous)
     // "password_env": "PI_AGENT_MQTT_PASSWORD", // default: unset
     // "device_name": "Pi Agent on Workstation", // default: Pi Agent on <hostname>
-    // "instance_id": "stable-id", // default: hostname-boot-pid-random (ephemeral)
+    // "instance_id": "stable-id", // default: pi session id (one device per session)
     // "project": "my-project", // default: basename of working directory
     "discovery_prefix": "homeassistant",
     "qos": 1,
@@ -82,7 +84,7 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 
 | Entity | Type | Notes |
 | --- | --- | --- |
-| Status | Sensor | `idle`, `working`, `tool`, `waiting`, `error`, `stopping` |
+| Status | Sensor | `idle`, `working`, `tool`, `waiting`, `error`, `stopping`, `compacting` |
 | Busy | Binary Sensor | On while the agent runs a task |
 | Session | Sensor | Active session id |
 | Model | Sensor | Active model id |

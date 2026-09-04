@@ -31,6 +31,9 @@ describe("Pi Extension Lifecycle", () => {
     expect(mockPi.on).toHaveBeenCalledWith("turn_end", expect.any(Function));
     expect(mockPi.on).toHaveBeenCalledWith("agent_settled", expect.any(Function));
     expect(mockPi.on).toHaveBeenCalledWith("model_select", expect.any(Function));
+    expect(mockPi.on).toHaveBeenCalledWith("session_before_compact", expect.any(Function));
+    expect(mockPi.on).toHaveBeenCalledWith("session_compact", expect.any(Function));
+    expect(mockPi.on).toHaveBeenCalledWith("session_compact_failed", expect.any(Function));
     expect(mockPi.on).toHaveBeenCalledWith("session_shutdown", expect.any(Function));
 
     expect(commands["mqtt-status"]).toBeDefined();

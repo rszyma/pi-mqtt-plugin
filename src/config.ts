@@ -53,6 +53,26 @@ export function _resetEphemeralIdCache(): void {
   cachedEphemeralId = null;
 }
 
+/**
+ * Resolve the MQTT identity for one session.
+ *
+ * Explicit config wins (`mqtt.instance_id` or PI_AGENT_MQTT_INSTANCE_ID).
+ * Otherwise the pi session id is used, so each session owns one HA device
+ * and resumes reclaim the same device (retained discovery still applies).
+ * The ephemeral per-process id is only a fallback before a session exists.
+ *
+ * Session ids are already unique; sanitize only for topic-safe use.
+ */
+export function resolveInstanceId(explicitId: string | undefined, sessionId?: string): string {
+  if (explicitId && explicitId.trim().length > 0) {
+    return explicitId.trim();
+  }
+  if (sessionId && sessionId.trim().length > 0) {
+    return sessionId.trim();
+  }
+  return ephemeralId();
+}
+
 export function getStableInstanceId(explicitId?: string): string {
   if (explicitId && explicitId.trim().length > 0) {
     return explicitId.trim();
@@ -158,6 +178,7 @@ export function resolveConfig(
   cwd: string = process.cwd(),
   customConfig?: Partial<MqttPluginConfig>,
   agentDir?: string,
+  sessionId?: string,
 ): MqttPluginConfig {
   // Resolve agentDir lazily so tests don't need to mock getAgentDir.
   const resolvedAgentDir = agentDir ?? path.join(os.homedir(), ".pi", "agent");
@@ -194,7 +215,10 @@ export function resolveConfig(
       ? Math.floor(willDelayRaw)
       : DEFAULT_WILL_DELAY_SECONDS;
 
-  const instanceId = getStableInstanceId(envInstanceId || mergedPartial.instance_id);
+  const rawExplicitId = envInstanceId || mergedPartial.instance_id;
+  const instanceId = resolveInstanceId(rawExplicitId, sessionId);
+  const explicitId =
+    rawExplicitId && rawExplicitId.trim().length > 0 ? rawExplicitId.trim() : undefined;
 
   const hostname = os.hostname() || "host";
   const projectDefault = path.basename(cwd) || undefined;
@@ -244,6 +268,7 @@ export function resolveConfig(
     password: resolvedPassword,
     password_env: mergedPartial.password_env || envPasswordEnv,
     instance_id: instanceId,
+    explicit_instance_id: explicitId,
     project,
     will_delay_seconds: willDelaySeconds,
     device_name: deviceName,
