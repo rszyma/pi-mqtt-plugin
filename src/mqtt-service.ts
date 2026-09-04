@@ -1,5 +1,5 @@
 import mqtt, { type MqttClient, type IClientOptions } from "mqtt";
-import { buildCleanupMessages, buildDiscoveryMessages } from "./discovery.js";
+import { buildCleanupMessages, buildCleanupMessagesForInstance, buildDiscoveryMessages } from "./discovery.js";
 import { StateManager } from "./state.js";
 import type { IncomingCommandPayload, MqttPluginConfig } from "./types.js";
 
@@ -185,17 +185,19 @@ export class MqttService {
     });
   }
 
-  public cleanDiscovery(): Promise<void> {
+  public pruneDiscovery(instanceIds: string[]): Promise<number> {
     return new Promise((resolve) => {
       if (!this.client || !this.isConnected) {
-        resolve();
+        resolve(0);
         return;
       }
 
-      const messages = buildCleanupMessages(this.config);
+      const messages = instanceIds.flatMap((id) =>
+        buildCleanupMessagesForInstance(this.config, id),
+      );
       let remaining = messages.length;
       if (remaining === 0) {
-        resolve();
+        resolve(0);
         return;
       }
 
@@ -207,11 +209,45 @@ export class MqttService {
           () => {
             remaining -= 1;
             if (remaining <= 0) {
-              resolve();
+              resolve(instanceIds.length);
             }
           },
         );
       }
+    });
+  }
+
+  /**
+   * Find dead sessions: subscribe to pi-agent/+/availability, collect the
+   * instance ids whose retained payload is "offline", then unsubscribe.
+   * Only matches sessions on the default base topic pattern.
+   */
+  public findDeadSessions(waitMs = 2000): Promise<string[]> {
+    return new Promise((resolve) => {
+      if (!this.client || !this.isConnected) {
+        resolve([]);
+        return;
+      }
+
+      const dead = new Set<string>();
+      const scanTopic = "pi-agent/+/availability";
+      const onMessage = (topic: string, payload: Buffer) => {
+        const match = /^pi-agent\/([^/]+)\/availability$/.exec(topic);
+        if (!match) return;
+        if (payload.toString("utf8") !== "offline") return;
+        if (match[1] === this.config.instance_id) return;
+        dead.add(match[1]);
+      };
+
+      const done = () => {
+        this.client?.removeListener("message", onMessage);
+        this.client?.unsubscribe(scanTopic, () => resolve([...dead]));
+      };
+
+      this.client.on("message", onMessage);
+      this.client.subscribe(scanTopic, { qos: 1 }, () => {
+        setTimeout(done, waitMs);
+      });
     });
   }
 

@@ -49,6 +49,16 @@ class MockMqttClient extends EventEmitter {
     return this;
   }
 
+  public unsubscribe(
+    _topic: string,
+    callback?: (err?: Error) => void,
+  ): this {
+    if (callback) {
+      callback();
+    }
+    return this;
+  }
+
   public end(force?: boolean, opts?: Record<string, unknown>, callback?: () => void): this {
     this.ended = true;
     if (callback) {
@@ -221,7 +231,7 @@ describe("MqttService", () => {
     expect(mockClientInstance!.ended).toBe(true);
   });
 
-  it("publishes empty retained payloads on cleanDiscovery", async () => {
+  it("publishes empty retained payloads on pruneDiscovery", async () => {
     let mockClientInstance: MockMqttClient | null = null;
     const stateManager = new StateManager(config);
 
@@ -237,11 +247,49 @@ describe("MqttService", () => {
     service.start();
     mockClientInstance!.emit("connect");
 
-    await service.cleanDiscovery();
+    await service.pruneDiscovery(["some-dead-session"]);
 
     const cleanMessages = mockClientInstance!.publishedMessages.filter(
       (m) => m.message === "" && m.opts.retain === true,
     );
     expect(cleanMessages.length).toBeGreaterThan(0);
+    expect(
+      cleanMessages.some((m) => m.topic.includes("some-dead-session")),
+    ).toBe(true);
+  });
+
+  it("finds dead sessions from retained offline availability", async () => {
+    let mockClientInstance: MockMqttClient | null = null;
+    const stateManager = new StateManager(config);
+
+    const service = new MqttService({
+      config,
+      stateManager,
+      clientFactory: (url, opts) => {
+        mockClientInstance = new MockMqttClient(url, opts);
+        return mockClientInstance as unknown as MqttClient;
+      },
+    });
+
+    service.start();
+    mockClientInstance!.emit("connect");
+
+    const found = service.findDeadSessions(10);
+    mockClientInstance!.emit(
+      "message",
+      "pi-agent/dead-node/availability",
+      Buffer.from("offline"),
+    );
+    mockClientInstance!.emit(
+      "message",
+      "pi-agent/live-node/availability",
+      Buffer.from("online"),
+    );
+    mockClientInstance!.emit(
+      "message",
+      "pi-agent/test-node/availability",
+      Buffer.from("offline"),
+    );
+    await expect(found).resolves.toEqual(["dead-node"]);
   });
 });

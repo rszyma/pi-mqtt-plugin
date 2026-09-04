@@ -203,7 +203,15 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
 }
 
 export function buildCleanupMessages(config: MqttPluginConfig): DiscoveryMessage[] {
-  const nodeId = sanitizeNodeId(config.instance_id);
+  return buildCleanupMessagesForInstance(config, config.instance_id);
+}
+
+/** Empty retained discovery configs for one instance id (prune support). */
+export function buildCleanupMessagesForInstance(
+  config: MqttPluginConfig,
+  instanceId: string,
+): DiscoveryMessage[] {
+  const nodeId = sanitizeNodeId(instanceId);
   const entities = [
     { component: "sensor", name: "status" },
     { component: "binary_sensor", name: "busy" },

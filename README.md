@@ -95,7 +95,7 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 
 - `/mqtt-status` — connection state and settings
 - `/mqtt-reload` — re-read settings (`/reload` still needed to reconnect)
-- `/mqtt-clean` — delete this session's discovery entities
+- `/mqtt-prune` — remove HA discovery for dead sessions (retained `offline`)
 
 ## Dashboards
 
@@ -122,8 +122,11 @@ A second card on `sensor.pi_agent_*_project` shows what each session works on.
 ## Cleanup
 
 Finished sessions stay registered until their retained discovery configs are
-deleted. `/mqtt-clean` removes one live session's configs; for the rest, run
-a recurring job: find `pi-agent/<node>/availability` topics holding retained
+deleted. Run `/mqtt-prune` from any live session: it scans retained
+`pi-agent/+/availability` topics for `offline` and clears the matching
+discovery configs. Only sessions on the default `pi-agent/<id>` base topic
+are found; custom `base_topic` setups need the manual variant below.
+For automation instead, run a recurring job: find `pi-agent/<node>/availability` topics holding retained
 `offline`, map each back to
 `<prefix>/{sensor,binary_sensor,button}/<sanitized-node>/*/config`
 (`[^a-zA-Z0-9_-]` → `_`), and clear them with empty retained publishes:
