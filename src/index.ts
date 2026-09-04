@@ -240,18 +240,6 @@ export default function homeAssistantMqttExtension(
     },
   });
 
-  pi.registerCommand("mqtt-reload", {
-    description: "Re-read MQTT settings (run /reload to reconnect)",
-    handler: async (_args, ctx) => {
-      const { loadError } = loadSettings(ctx);
-      ctx.ui.notify(
-        loadError
-          ? `Reloaded settings (with error: ${loadError}) — run /reload to reconnect MQTT`
-          : "Reloaded MQTT settings — run /reload to reconnect with new config",
-        loadError ? "warning" : "info",
-      );
-    },
-  });
 }
 
 export * from "./types.js";

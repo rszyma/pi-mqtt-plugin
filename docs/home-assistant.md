@@ -48,8 +48,26 @@ dashboard above, and never triggering `working → idle` automations.
 ## Labels
 
 MQTT discovery cannot set labels, but an automation can tag each new device.
-Needs [Spook](https://spook.boo) (HACS) for the label action. Create a
-"Pi Agent" label in Settings → Labels first:
+
+> `homeassistant.add_label_to_device` is not built into Home Assistant.
+> It is provided by [Spook](https://spook.boo) (HACS custom integration).
+> `unknown action: homeassistant.add_label_to_device` means Spook is
+> missing, disabled, or failed to load. Fix Spook, do not just delete
+> the action (removing Spook removes the action again).
+
+### Prerequisites
+
+1. Install [HACS](https://hacs.xyz/docs/use/) if needed.
+2. In HACS, install **Spook**, then restart Home Assistant.
+3. Go to Settings → Devices & Services → Add Integration → **Spook**.
+   Confirm its entry is enabled (not ignored or disabled).
+4. Go to Settings → Labels → create a label named exactly `Pi Agent`.
+5. Verify before you create the automation: Developer Tools → Actions →
+   search for `homeassistant.add_label_to_device`. If it is missing,
+   Spook did not load. Check Settings → System → Logs for `spook`
+   errors and confirm your Spook version supports your HA version.
+
+Only then create the automation below:
 
 ```yaml
 alias: Label new Pi Agent devices
@@ -70,6 +88,14 @@ actions:
       label_id: "{{ label_id('Pi Agent') }}"
 mode: parallel
 ```
+
+If the automation already exists and reports `unknown action`:
+
+1. Do not delete the action. That repair warning is generic text.
+2. Re-install or re-enable Spook (steps 2-3 above), then restart HA.
+3. Re-check Developer Tools → Actions for the action name.
+4. Reload automations: Developer Tools → YAML → Automations → Reload.
+   The repair warning clears once the action exists again.
 
 ## Automations
 

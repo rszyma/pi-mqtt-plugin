@@ -94,7 +94,6 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 ## Commands
 
 - `/mqtt-status` — connection state and settings
-- `/mqtt-reload` — re-read settings (`/reload` still needed to reconnect)
 
 ## Home Assistant integration
 
