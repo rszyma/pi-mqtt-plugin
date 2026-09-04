@@ -136,7 +136,7 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     expect(holderMsg).toBeDefined();
     const holderPayload = JSON.parse(holderMsg!.payload);
     expect(holderPayload.unique_id).toBe("pi_agent_dev_pi_holder");
-    expect(holderPayload.value_template).toBe("{{ value_json.holder | default('free') }}");
+    expect(holderPayload.value_template).toBe("{{ value_json.holder | default('unknown') }}");
   });
 
   it("omits holder sensor when disabled in expose config", () => {

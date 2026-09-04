@@ -126,13 +126,13 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
     });
   }
 
-  // 5. Holder Sensor (what this session works on; "free" when unset).
+  // 5. Holder Sensor (what this session works on; "unknown" when unset).
   if (config.expose.holder !== false) {
     const holderPayload: HomeAssistantSensorDiscovery = {
       name: "Holder",
       unique_id: `pi_agent_${uniquePrefix}_holder`,
       state_topic: stateTopic,
-      value_template: "{{ value_json.holder | default('free') }}",
+      value_template: "{{ value_json.holder | default('unknown') }}",
       availability_topic: availabilityTopic,
       payload_available: "online",
       payload_not_available: "offline",

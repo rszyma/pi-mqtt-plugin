@@ -45,7 +45,7 @@ pi install ./pi-home-assistant-mqtt
     // "password_env": "PI_AGENT_MQTT_PASSWORD", // default: unset
     // "device_name": "Pi Agent on Workstation", // default: Pi Agent on <hostname>
     // "instance_id": "stable-id", // default: hostname-pid-random (ephemeral)
-    // "holder": "my-project", // default: unset (Holder sensor reads "free")
+    // "holder": "my-project", // default: unset (Holder sensor reads "unknown")
     "discovery_prefix": "homeassistant",
     "qos": 1,
     "retain_state": true,
@@ -85,7 +85,7 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 | Busy | Binary Sensor | On while the agent runs a task |
 | Session | Sensor | Active session id |
 | Model | Sensor | Active model id |
-| Holder | Sensor | Project label, `free` when unset |
+| Holder | Sensor | Project label, `unknown` when unset |
 | Last Activity | Sensor | Timestamp of latest state change |
 | Stop | Button | Only when `controls.stop` is on |
 

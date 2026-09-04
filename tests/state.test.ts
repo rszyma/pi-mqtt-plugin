@@ -101,9 +101,9 @@ describe("StateManager", () => {
     expect(payload.input_tokens).toBeUndefined();
   });
 
-  it("exposes holder in state payload defaulting to free", () => {
+  it("exposes holder in state payload defaulting to unknown", () => {
     const manager = new StateManager(config);
-    expect(manager.buildFilteredStatePayload().holder).toBe("free");
+    expect(manager.buildFilteredStatePayload().holder).toBe("unknown");
     manager.setHolder("myproj");
     expect(manager.buildFilteredStatePayload().holder).toBe("myproj");
   });

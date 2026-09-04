@@ -109,7 +109,7 @@ export class StateManager {
     }
 
     if (this.config.expose.holder !== false) {
-      payload.holder = this.state.holder ?? "free";
+      payload.holder = this.state.holder ?? "unknown";
     }
 
     if (this.config.expose.tool !== false) {

@@ -177,7 +177,7 @@ export default function homeAssistantMqttExtension(
         `Broker: ${config.broker}`,
         `Connected: ${connected ? "Yes" : "No"}`,
         `Instance ID: ${config.instance_id} (ephemeral per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
-        `Holder: ${config.holder ?? "free"}`,
+        `Holder: ${config.holder ?? "unknown"}`,
         `Will delay: ${config.will_delay_seconds}s`,
         `Base Topic: ${config.base_topic}`,
         `Discovery Prefix: ${config.discovery_prefix}`,
