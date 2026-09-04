@@ -249,7 +249,7 @@ export default function homeAssistantMqttExtension(
       `Broker: ${config.broker}`,
       `Name: ${config.device_name}`,
       `Instance ID: ${config.instance_id} (one per session; PI_AGENT_MQTT_INSTANCE_ID pins it)`,
-      `Project: ${config.project ?? "unknown"}`,
+      `Project: ${config.project ?? "unknown"} (mqtt.project or PI_AGENT_MQTT_PROJECT overrides it)`,
       `Base Topic: ${config.base_topic}`,
       `Discovery Prefix: ${config.discovery_prefix}`,
       `Global settings: ${globalSettingsPath ?? "?"} / project ${projectSettingsPath ?? "?"}`,
