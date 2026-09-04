@@ -24,13 +24,15 @@ show_empty: true
 Ids follow `sensor.pi_agent_<instance>_status` (`<instance>` sanitized).
 A second card on `sensor.pi_agent_*_project` shows what each session works on.
 
-## Cleanup
+## Auto-cleanup setup
 
-Finished sessions stay registered until their retained discovery configs are
-deleted. Run `/mqtt-prune` from any live session: it reads retained status
-discovery configs, checks each device's own availability topic, and clears
-the configs of the dead ones.
-For automation instead, run a recurring job: find `pi-agent/<node>/availability` topics holding retained
+NOTE: The following doesn't apply to users who do not pin instance id (with PI_AGENT_MQTT_INSTANCE_ID).
+If you do not use instance id pinning, this plugin will be creating a new MQTT device every time starting new Pi session.
+(Either way can make sense, depending on your requirements).
+
+Finished sessions stay registered until their retained discovery configs are deleted.
+This deletion doesn't happen automatically, but you can set up automation for this.
+Run a recurring job: find `pi-agent/<node>/availability` topics holding retained
 `offline`, map each back to
 `<prefix>/{sensor,binary_sensor,button}/<sanitized-node>/*/config`
 (`[^a-zA-Z0-9_-]` → `_`), and clear them with empty retained publishes:

@@ -95,7 +95,6 @@ Env vars: `PI_AGENT_MQTT_BROKER`, `PI_AGENT_MQTT_USERNAME`,
 
 - `/mqtt-status` — connection state and settings
 - `/mqtt-reload` — re-read settings (`/reload` still needed to reconnect)
-- `/mqtt-prune` — remove HA discovery for dead sessions (retained `offline`)
 
 ## Home Assistant integration
 

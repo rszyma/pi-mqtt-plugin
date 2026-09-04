@@ -240,32 +240,6 @@ export default function homeAssistantMqttExtension(
     },
   });
 
-  pi.registerCommand("mqtt-prune", {
-    description: "Remove Home Assistant discovery for dead Pi Agent sessions",
-    handler: async (_args, ctx) => {
-      if (!mqttService || !mqttService.getConnected()) {
-        ctx.ui.notify("MQTT service is not connected", "warning");
-        return;
-      }
-
-      ctx.ui.notify("Scanning for dead Pi Agent sessions...", "info");
-      const dead = await mqttService.findDeadSessions();
-      if (dead.length === 0) {
-        ctx.ui.notify("No dead Pi Agent sessions found", "info");
-        return;
-      }
-
-      const confirm = await ctx.ui.confirm(
-        "Prune dead sessions",
-        `Remove HA discovery for ${dead.length} dead session(s)?\n${dead.map((d) => d.instanceId).join("\n")}`,
-      );
-      if (!confirm) return;
-
-      const pruned = await mqttService.pruneDiscovery(dead);
-      ctx.ui.notify(`Pruned ${pruned} dead session(s): ${dead.map((d) => d.instanceId).join(", ")}`, "info");
-    },
-  });
-
   pi.registerCommand("mqtt-reload", {
     description: "Re-read MQTT settings (run /reload to reconnect)",
     handler: async (_args, ctx) => {

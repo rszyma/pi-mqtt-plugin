@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildCleanupMessages,
   buildDevicePayload,
   buildDiscoveryMessages,
   sanitizeNodeId,
@@ -169,18 +168,5 @@ describe("Home Assistant MQTT Discovery Builder", () => {
     };
     const messages = buildDiscoveryMessages(noProject);
     expect(messages.find((m) => m.topic.includes("/project/"))).toBeUndefined();
-  });
-
-  it("builds cleanup messages with empty retained payloads", () => {
-    const projectCleanup = buildCleanupMessages(baseConfig).find((m) =>
-      m.topic === "homeassistant/sensor/dev-pi/project/config",
-    );
-    expect(projectCleanup).toBeDefined();
-    const cleanup = buildCleanupMessages(baseConfig);
-    expect(cleanup.length).toBeGreaterThan(0);
-    for (const msg of cleanup) {
-      expect(msg.payload).toBe("");
-      expect(msg.retain).toBe(true);
-    }
   });
 });

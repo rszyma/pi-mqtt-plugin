@@ -1,11 +1,7 @@
 import mqtt, { type MqttClient, type IClientOptions } from "mqtt";
-import { buildCleanupMessagesForInstance, buildDiscoveryMessages, sanitizeNodeId } from "./discovery.js";
+import { buildDiscoveryMessages } from "./discovery.js";
 import { StateManager } from "./state.js";
 import type { IncomingCommandPayload, MqttPluginConfig } from "./types.js";
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 export type CommandHandler = (command: string) => Promise<void> | void;
 
@@ -186,116 +182,6 @@ export class MqttService {
     this.client.publish(topic, payload, {
       retain: this.config.retain_state,
       qos: this.config.qos,
-    });
-  }
-
-  public pruneDiscovery(dead: Array<{ instanceId: string }>): Promise<number> {
-    return new Promise((resolve) => {
-      if (!this.client || !this.isConnected) {
-        resolve(0);
-        return;
-      }
-
-      const messages = dead.flatMap((d) =>
-        buildCleanupMessagesForInstance(this.config, d.instanceId),
-      );
-      let remaining = messages.length;
-      if (remaining === 0) {
-        resolve(0);
-        return;
-      }
-
-      for (const msg of messages) {
-        this.client.publish(
-          msg.topic,
-          msg.payload,
-          { retain: msg.retain, qos: msg.qos },
-          () => {
-            remaining -= 1;
-            if (remaining <= 0) {
-              resolve(dead.length);
-            }
-          },
-        );
-      }
-    });
-  }
-
-  /**
-   * Find dead sessions: subscribe to the discovery prefix, parse retained
-   * status configs, then check each device's own availability topic.
-   */
-  public findDeadSessions(waitMs = 2000): Promise<Array<{ instanceId: string; availabilityTopic: string }>> {
-    return new Promise((resolve) => {
-      if (!this.client || !this.isConnected) {
-        resolve([]);
-        return;
-      }
-
-      // status config -> capture node id; configs carry the topics.
-      const statusRe = new RegExp(
-        `^${escapeRegExp(this.config.discovery_prefix)}/sensor/([^/]+)/status/config$`,
-      );
-      const instanceRe = /^pi-agent:(.+)$/;
-      const candidates = new Map<string, string>();
-      const scanTopic = `${this.config.discovery_prefix}/sensor/+/status/config`;
-      const onMessage = (topic: string, payload: Buffer) => {
-        const statusMatch = statusRe.exec(topic);
-        if (statusMatch) {
-          try {
-            const parsed = JSON.parse(payload.toString("utf8")) as {
-              availability_topic?: string;
-              device?: { identifiers?: unknown };
-            };
-            const availabilityTopic = parsed.availability_topic;
-            if (typeof availabilityTopic !== "string" || availabilityTopic.length === 0) return;
-            // Only our devices: identifier "pi-agent:<instance>", and the
-            // node id in the topic must be that instance's sanitized form.
-            // Without this check a foreign config under our prefix could
-            // point availability at an unrelated topic and get pruned.
-            const ids = parsed.device?.identifiers;
-            const rawId = Array.isArray(ids)
-              ? ids.map((id) => typeof id === "string" ? instanceRe.exec(id)?.[1] : undefined).find((id) => id !== undefined)
-              : undefined;
-            if (rawId === undefined || sanitizeNodeId(rawId) !== statusMatch[1]) return;
-            candidates.set(availabilityTopic, statusMatch[1]);
-            this.client?.subscribe(availabilityTopic, { qos: 1 });
-          } catch { /* ignore malformed retained configs */ }
-          return;
-        }
-        // Availability probe response.
-        const nodeId = candidates.get(topic);
-        if (nodeId === undefined) return;
-        if (payload.toString("utf8") !== "offline") {
-          candidates.delete(topic);
-        }
-      };
-
-      const done = () => {
-        this.client?.removeListener("message", onMessage);
-        const topics = [scanTopic, ...candidates.keys()];
-        const dead = [...candidates.entries()].map(([availabilityTopic, nodeId]) => ({
-          instanceId: nodeId,
-          availabilityTopic,
-        }));
-        const filtered = dead.filter((d) => d.instanceId !== sanitizeNodeId(this.config.instance_id));
-        let pending = topics.length;
-        if (pending === 0) {
-          resolve(filtered);
-          return;
-        }
-        for (const t of topics) {
-          this.client?.unsubscribe(t, () => {
-            pending -= 1;
-            if (pending <= 0) resolve(filtered);
-          });
-        }
-      };
-
-      this.client.on("message", onMessage);
-      this.client.subscribe(scanTopic, { qos: 1 }, () => {
-        setTimeout(done, waitMs);
-      });
     });
   }
 

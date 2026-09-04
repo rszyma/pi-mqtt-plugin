@@ -50,7 +50,7 @@ class MockMqttClient extends EventEmitter {
   }
 
   public unsubscribe(
-    _topic: string,
+    topic: string,
     callback?: (err?: Error) => void,
   ): this {
     if (callback) {
@@ -229,109 +229,5 @@ describe("MqttService", () => {
     );
     expect(offlineMsg).toBeDefined();
     expect(mockClientInstance!.ended).toBe(true);
-  });
-
-  it("publishes empty retained payloads on pruneDiscovery", async () => {
-    let mockClientInstance: MockMqttClient | null = null;
-    const stateManager = new StateManager(config);
-
-    const service = new MqttService({
-      config,
-      stateManager,
-      clientFactory: (url, opts) => {
-        mockClientInstance = new MockMqttClient(url, opts);
-        return mockClientInstance as unknown as MqttClient;
-      },
-    });
-
-    service.start();
-    mockClientInstance!.emit("connect");
-
-    await service.pruneDiscovery([{ instanceId: "some-dead-session" }]);
-
-    const cleanMessages = mockClientInstance!.publishedMessages.filter(
-      (m) => m.message === "" && m.opts.retain === true,
-    );
-    expect(cleanMessages.length).toBeGreaterThan(0);
-    expect(
-      cleanMessages.some((m) => m.topic.includes("some-dead-session")),
-    ).toBe(true);
-  });
-
-  it("finds dead sessions via discovery configs regardless of base topic", async () => {
-    let mockClientInstance: MockMqttClient | null = null;
-    const stateManager = new StateManager(config);
-
-    const service = new MqttService({
-      config,
-      stateManager,
-      clientFactory: (url, opts) => {
-        mockClientInstance = new MockMqttClient(url, opts);
-        return mockClientInstance as unknown as MqttClient;
-      },
-    });
-
-    service.start();
-    mockClientInstance!.emit("connect");
-
-    const found = service.findDeadSessions(20);
-    // Retained status configs arrive first; each carries its availability topic.
-    // Node ids are sanitizeNodeId(instance): "dead-node" stays as-is.
-    mockClientInstance!.emit(
-      "message",
-      "homeassistant/sensor/dead-node/status/config",
-      Buffer.from(
-        JSON.stringify({
-          availability_topic: "custom/dead-node/availability",
-          device: { identifiers: ["pi-agent:dead-node"] },
-        }),
-      ),
-    );
-    mockClientInstance!.emit(
-      "message",
-      "homeassistant/sensor/live-node/status/config",
-      Buffer.from(
-        JSON.stringify({
-          availability_topic: "custom/live-node/availability",
-          device: { identifiers: ["pi-agent:live-node"] },
-        }),
-      ),
-    );
-    mockClientInstance!.emit(
-      "message",
-      "homeassistant/sensor/other/status/config",
-      Buffer.from(
-        JSON.stringify({
-          availability_topic: "other/availability",
-          device: { identifiers: ["not-ours:other"] },
-        }),
-      ),
-    );
-    // Foreign config under our prefix: right identifier shape but the node
-    // id does not match the sanitized instance, so it must be skipped.
-    mockClientInstance!.emit(
-      "message",
-      "homeassistant/sensor/trap/status/config",
-      Buffer.from(
-        JSON.stringify({
-          availability_topic: "custom/dead-node/availability",
-          device: { identifiers: ["pi-agent:someone-else"] },
-        }),
-      ),
-    );
-    // Availability probe responses.
-    mockClientInstance!.emit(
-      "message",
-      "custom/dead-node/availability",
-      Buffer.from("offline"),
-    );
-    mockClientInstance!.emit(
-      "message",
-      "custom/live-node/availability",
-      Buffer.from("online"),
-    );
-    await expect(found).resolves.toEqual([
-      { instanceId: "dead-node", availabilityTopic: "custom/dead-node/availability" },
-    ]);
   });
 });
