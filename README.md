@@ -138,39 +138,11 @@ mosquitto_pub -h "$BROKER" -t "$CONFIG_TOPIC" -n -r
 Until pruned, stale devices are harmless: `unavailable`, hidden from the
 dashboard above, and never triggering `working → idle` automations.
 
-## Automations
-
-Add via Settings → Automations & scenes → Create automation → ⋮ (top
-right) → Edit in YAML → paste → Save.
-
-Dead sessions go `unavailable`, never `idle`, so completion automations only
-fire for live agents. Closing the lid triggers nothing. The trigger watches
-all Status sensors at once by label (see Labels below — create and
-auto-assign the "Pi Agent" label first); the notification names the device
-that finished:
-
-```yaml
-alias: Pi Agent Finished
-triggers:
-  - trigger: state
-    entities:
-      - label_id('Pi Agent')
-    from: ["working", "tool"]
-    to: "idle"
-actions:
-  - action: notify.notify
-    data:
-      title: "Pi Agent"
-      message: "{{ trigger.to_state.name }} completed the task."
-mode: single
-```
-
 ## Labels
 
 MQTT discovery cannot set labels, but an automation can tag each new device.
-Labels also power the "any agent finished" automation above. Needs
-[Spook](https://spook.boo) (HACS) for the label action. Create a "Pi Agent"
-label in Settings → Labels first:
+Needs [Spook](https://spook.boo) (HACS) for the label action. Create a
+"Pi Agent" label in Settings → Labels first:
 
 ```yaml
 alias: Label new Pi Agent devices
@@ -190,6 +162,32 @@ actions:
       device_id: "{{ trigger.event.data.device_id }}"
       label_id: "{{ label_id('Pi Agent') }}"
 mode: parallel
+```
+
+## Automations
+
+Add via Settings → Automations & scenes → Create automation → ⋮ (top
+right) → Edit in YAML → paste → Save.
+
+Dead sessions go `unavailable`, never `idle`, so completion automations only
+fire for live agents. Closing the lid triggers nothing. Requires the "Pi
+Agent" label above: the trigger watches all Status sensors with that label
+at once, and the notification names the device that finished:
+
+```yaml
+alias: Pi Agent Finished
+triggers:
+  - trigger: state
+    entities:
+      - label_id('Pi Agent')
+    from: ["working", "tool"]
+    to: "idle"
+actions:
+  - action: notify.notify
+    data:
+      title: "Pi Agent"
+      message: "{{ trigger.to_state.name }} completed the task."
+mode: single
 ```
 
 ## Development
