@@ -136,7 +136,7 @@ export function buildDiscoveryMessages(config: MqttPluginConfig): DiscoveryMessa
       availability_topic: availabilityTopic,
       payload_available: "online",
       payload_not_available: "offline",
-      icon: "mdi:account-box",
+      icon: "mdi:folder-outline",
       expire_after: expireAfter,
       device,
     };
