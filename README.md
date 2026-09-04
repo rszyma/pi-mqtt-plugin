@@ -94,7 +94,8 @@ Environment variables override file settings.
 Add an `mqtt` key to `~/.pi/agent/settings.json` (global) or `.pi/settings.json` (project).
 Project settings override global settings — same pattern as `pi-ding`.
 
-Global example (`~/.pi/agent/settings.json`):
+Global example (`~/.pi/agent/settings.json`) — values shown are the defaults,
+so unset keys fall back to these:
 
 ```json
 {
@@ -141,32 +142,14 @@ or `mqtt.instance_id` in settings (e.g. per systemd unit or docker env).
 Legacy files `.pi/mqtt.json` and `~/.pi/agent/mqtt.json` still work but are
 deprecated — migrate their contents under the `mqtt` key in `settings.json`.
 
-### Defaults
-
-Every key is optional. Unset keys fall back to these defaults:
+Only non-obvious defaults, not shown in the example above:
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `broker` | `mqtt://127.0.0.1:1883` | |
-| `username` / `password` | unset | Anonymous access |
-| `password_env` | unset | Name of env var holding the password |
 | `instance_id` | `hostname-pid-random` | Ephemeral per process; set to pin a stable device |
-| `holder` | unset | Label for the Holder sensor; reads `free` when unset |
+| `holder` | unset | Holder sensor reads `free` when unset |
 | `device_name` | `Pi Agent on <hostname>` | |
 | `base_topic` | `pi-agent/<instance_id>` | |
-| `discovery_prefix` | `homeassistant` | |
-| `qos` | `1` | |
-| `retain_state` | `true` | |
-| `publish_interval_seconds` | `5` | `0` disables periodic republish |
-| `will_delay_seconds` | `90` | MQTT 5 only; `0` disables |
-| `controls.stop` | `false` | |
-| `expose.session` | `true` | |
-| `expose.model` | `true` | |
-| `expose.holder` | `true` | |
-| `expose.tool` | `true` | |
-| `expose.token_usage` | `true` | |
-| `expose.errors` | `true` | |
-| `expose.context_percent` | `true` | |
 
 ### Dashboards: show only live agents
 
