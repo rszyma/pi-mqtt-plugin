@@ -106,5 +106,6 @@ helpful for a better synergy with [MQTT Home Assistant Integration](https://www.
 npm install      # install deps
 npm test         # run tests (vitest)
 npm run check    # typecheck (tsc --noEmit)
-npm run build    # compile to dist/ (also runs on prepack)
 ```
+
+NOTE: typescript compilation step is not needed, since Pi can run typescript plugin code directly via jiti.

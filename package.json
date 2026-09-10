@@ -26,8 +26,7 @@
   "scripts": {
     "build": "tsc",
     "check": "tsc --noEmit",
-    "test": "vitest run",
-    "prepack": "npm run build"
+    "test": "vitest run"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
