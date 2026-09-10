@@ -19,6 +19,15 @@ export default function homeAssistantMqttExtension(
   let projectSettingsPath: string | undefined;
   let lastLoadError: string | undefined;
 
+  // Overlapping session_start deliveries for one logical switch must
+  // serialize: without chaining, two handlers interleave, each misses the
+  // other's service as "previous", and both connect. The chain plus the
+  // claim/sequence checks make the newer start win and the loser retire
+  // whatever it took over, so only one device survives.
+  let startChain: Promise<void> = Promise.resolve();
+  let activeSessionId: string | null = null;
+  let startSeq = 0;
+
   function loadSettings(ctx: { cwd: string }): { loadError: string | undefined } {
     const agentDir = getAgentDir();
     globalSettingsPath = path.join(agentDir, "settings.json");
@@ -54,47 +63,79 @@ export default function homeAssistantMqttExtension(
 
   async function startSessionDevice(ctx: ExtensionContext): Promise<void> {
     const sessionId = ctx.sessionManager.getSessionId();
-    // Session switches arrive as session_start with reason new/resume/fork.
-    // Retire the previous session's device first so it reads unavailable
-    // instead of freezing green on its last state.
-    if (mqttService) {
-      await mqttService.shutdown();
-      mqttService = null;
-    }
-    const { loadError } = loadSettings(ctx);
-    if (loadError && ctx.hasUI) {
-      ctx.ui.notify(lastLoadError!, "warning");
-    }
-    config = resolveConfig(ctx.cwd, customConfig, undefined, sessionId);
-    stateManager = new StateManager(config);
-
-    stateManager.setSession(sessionId);
-
-    if (ctx.model) {
-      stateManager.setModel(`${ctx.model.provider}/${ctx.model.id}`);
-    }
-
-    if (config.project) {
-      stateManager.setProject(config.project);
-    }
-
-    stateManager.setStatus("idle");
-    // Restore the true total on reload/resume: fresh state starts at 0.
-    refreshCostUsd(ctx.sessionManager.getEntries() as Parameters<typeof refreshCostUsd>[0]);
-
-    mqttService = new MqttService({
-      config,
-      stateManager,
-      onCommand: async (command) => {
-        if (command === "stop") {
-          stateManager?.setStatus("stopping");
-          mqttService?.publishState();
-          ctx.ui.notify("Received stop command from Home Assistant", "warning");
-        }
-      },
+    const mySeq = ++startSeq;
+    // Claim the session BEFORE any await: a racing twin start observes
+    // this claim and stands down, so only one device survives even when
+    // two starts interleave.
+    activeSessionId = sessionId;
+    const previousService = mqttService;
+    mqttService = null;
+    const priorStart = startChain;
+    let releaseChain: () => void = () => {};
+    startChain = new Promise<void>((resolve) => {
+      releaseChain = resolve;
     });
+    try {
+      // Serialize with any in-flight start so a racing twin cannot slip
+      // in between our shutdown and our connect.
+      await priorStart;
+      if (mySeq !== startSeq || sessionId !== activeSessionId) {
+        // A newer start superseded us while we waited: stand down after
+        // retiring whatever we took over, so no device is left behind.
+        if (previousService) {
+          await previousService.shutdown();
+        }
+        return;
+      }
+      // Session switches arrive as session_start with reason
+      // new/resume/fork. Retire the previous session's device first so
+      // it reads unavailable instead of freezing green on its last state.
+      if (previousService) {
+        await previousService.shutdown();
+      }
+      if (mySeq !== startSeq || sessionId !== activeSessionId) {
+        return;
+      }
+      const { loadError } = loadSettings(ctx);
+      if (loadError && ctx.hasUI) {
+        ctx.ui.notify(lastLoadError!, "warning");
+      }
+      config = resolveConfig(ctx.cwd, customConfig, undefined, sessionId);
+      stateManager = new StateManager(config);
 
-    mqttService.start();
+      stateManager.setSession(sessionId);
+
+      if (ctx.model) {
+        stateManager.setModel(`${ctx.model.provider}/${ctx.model.id}`);
+      }
+
+      if (config.project) {
+        stateManager.setProject(config.project);
+      }
+
+      stateManager.setStatus("idle");
+      // Restore the true total on reload/resume: fresh state starts at 0.
+      refreshCostUsd(ctx.sessionManager.getEntries() as Parameters<typeof refreshCostUsd>[0]);
+
+      if (mySeq !== startSeq || sessionId !== activeSessionId) {
+        return;
+      }
+      mqttService = new MqttService({
+        config,
+        stateManager,
+        onCommand: async (command) => {
+          if (command === "stop") {
+            stateManager?.setStatus("stopping");
+            mqttService?.publishState();
+            ctx.ui.notify("Received stop command from Home Assistant", "warning");
+          }
+        },
+      });
+
+      mqttService.start();
+    } finally {
+      releaseChain();
+    }
   }
 
   pi.on("session_start", async (_event, ctx) => {
@@ -199,15 +240,21 @@ export default function homeAssistantMqttExtension(
     }
   });
 
-  pi.on("session_shutdown", async (event) => {
-    // Replacement (new/resume/fork) is handled at the next session_start,
-    // which retires this device before adopting the new one. Only tear down
-    // here on real exit/reload.
-    if (event.reason === "quit" || event.reason === "reload") {
-      if (mqttService) {
-        await mqttService.shutdown();
-        mqttService = null;
-      }
+  pi.on("session_shutdown", async () => {
+    // Retire the device on every shutdown, including session replacement
+    // (new/resume/fork). The shutdown emit runs on the outgoing runner
+    // (same extension instance that owns the live service), while the
+    // next session_start lands on the replacement instance — so without
+    // this, the old instance's service would stay connected with its own
+    // timers and keep publishing under its own device id.
+    // In-order delivery per runner makes a stale-shutdown race
+    // impossible: this instance's shutdown always precedes any newer
+    // start on the replacement instance.
+    if (mqttService) {
+      activeSessionId = null;
+      const outgoing = mqttService;
+      mqttService = null;
+      await outgoing.shutdown();
     }
   });
 
